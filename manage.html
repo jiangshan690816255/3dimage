@@ -188,7 +188,7 @@
         };
 
         // 初始化
-        fetch('./menu.json')
+        fetch('./menu.json?_=' + Date.now())
             .then(res => res.json())
             .then(data => {
                 menuData = data;
@@ -247,7 +247,7 @@
                             <img class="prev" src="${item.image}">
                             <div class="fbx-tag ${item.model ? 'show' : ''}">FBX</div>
                         </div>
-                        <button onclick="delItem(${uidx},${idx})">删</button>
+                        <button onclick="delItem(${uidx},${idx}, this)">删</button>
                     `;
                     items.appendChild(i);
 
@@ -335,23 +335,29 @@
             icon.textContent = '▼';
         };
 
-        window.delItem = function (uidx, idx) {
+        // 删除例题，不折叠菜单
+        window.delItem = function (uidx, idx, btnEl) {
             if (!confirm('确定删除？')) return;
             delete fileBuffer[`${uidx}-${idx}`];
             menuData.firstMenu[uidx].secondMenu.splice(idx, 1);
-            render();
+            const itemEl = btnEl.closest('.item');
+            if (itemEl) itemEl.remove();
         };
 
+        // ====================== ✅ 修复：只有真正选择了FBX，才生成model路径 ======================
         function getJson() {
             document.querySelectorAll('.unit').forEach((u, uidx) => {
                 menuData.firstMenu[uidx].name = u.querySelector('.uname').value;
                 const arr = [];
                 u.querySelectorAll('.item').forEach((it, idx) => {
                     const t = it.querySelector('.title').value.trim();
+                    const key = `${uidx}-${idx}`;
+                    const hasFBX = !!fileBuffer[key]; // 判断是否真的选了模型
+
                     arr.push({
                         title: t,
                         image: it.querySelector('.prev').src,
-                        model: `/models/${t}.fbx`
+                        model: hasFBX ? `/models/${t}.fbx` : "" // 没选就为空
                     });
                 });
                 menuData.firstMenu[uidx].secondMenu = arr;
