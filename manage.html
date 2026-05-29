@@ -86,9 +86,7 @@
             flex-shrink:0;
         }
 
-        .fbx-tag {
-            background:#ef4444;
-            color:#fff;
+        .fbx-tag, .video-tag {
             font-size:12px;
             padding:2px 6px;
             border-radius:4px;
@@ -97,7 +95,9 @@
             white-space:nowrap;
             flex-shrink:0;
         }
-        .fbx-tag.show{display:inline-block;}
+        .fbx-tag {background:#ef4444;color:#fff;}
+        .video-tag {background:#1677ff;color:#fff;}
+        .fbx-tag.show, .video-tag.show{display:inline-block;}
 
         .item button{
             background:#f56c6c!important;
@@ -202,7 +202,8 @@
                         "secondMenu": [{
                             "title": "新例题",
                             "image": "",
-                            "model": ""
+                            "model": "",
+                            "video": ""
                         }]
                     }]
                 };
@@ -241,10 +242,12 @@
                         <div class="item-left">
                             <div class="item-row"><label>标题：</label><input class="title" value="${item.title}"></div>
                             <div class="item-row"><label>图片：</label><input type="file" class="imgFile"></div>
+                            <div class="item-row"><label>视频：</label><input type="file" class="videoFile" accept="video/*"></div>
                             <div class="item-row"><label>模型：</label><input type="file" class="modelFile" accept=".fbx"></div>
                         </div>
                         <div class="img-box">
                             <img class="prev" src="${item.image}">
+                            <div class="video-tag ${item.video ? 'show' : ''}">视频</div>
                             <div class="fbx-tag ${item.model ? 'show' : ''}">FBX</div>
                         </div>
                         <button onclick="delItem(${uidx},${idx}, this)">删</button>
@@ -254,8 +257,10 @@
                     const prev = i.querySelector('.prev');
                     const imgFile = i.querySelector('.imgFile');
                     const modelFile = i.querySelector('.modelFile');
+                    const videoFile = i.querySelector('.videoFile');
                     const titleInput = i.querySelector('.title');
                     const fbxTag = i.querySelector('.fbx-tag');
+                    const videoTag = i.querySelector('.video-tag');
                     const key = `${uidx}-${idx}`;
 
                     prev.onclick = function () {
@@ -274,6 +279,14 @@
                         };
                         reader.readAsDataURL(f);
                     };
+
+                    videoFile.onchange = function(){
+                        const f = videoFile.files[0];
+                        if(f){
+                            fileBuffer[key + "_video"] = f;
+                            videoTag.classList.add('show');
+                        }
+                    }
 
                     modelFile.onchange = function () {
                         const f = modelFile.files[0];
@@ -305,7 +318,8 @@
                 secondMenu: [{
                     title: "新例题",
                     image: "",
-                    model: ""
+                    model: "",
+                    video: ""
                 }]
             });
             render();
@@ -326,7 +340,8 @@
             menuData.firstMenu[uidx].secondMenu.push({
                 title: "新例题",
                 image: "",
-                model: ""
+                model: "",
+                video: ""
             });
             render();
             const content = document.getElementById(`content-${uidx}`);
@@ -339,12 +354,13 @@
         window.delItem = function (uidx, idx, btnEl) {
             if (!confirm('确定删除？')) return;
             delete fileBuffer[`${uidx}-${idx}`];
+            delete fileBuffer[`${uidx}-${idx}_video`];
             menuData.firstMenu[uidx].secondMenu.splice(idx, 1);
             const itemEl = btnEl.closest('.item');
             if (itemEl) itemEl.remove();
         };
 
-        // ====================== ✅ 修复：只有真正选择了FBX，才生成model路径 ======================
+        // 生成JSON路径配置
         function getJson() {
             document.querySelectorAll('.unit').forEach((u, uidx) => {
                 menuData.firstMenu[uidx].name = u.querySelector('.uname').value;
@@ -352,12 +368,14 @@
                 u.querySelectorAll('.item').forEach((it, idx) => {
                     const t = it.querySelector('.title').value.trim();
                     const key = `${uidx}-${idx}`;
-                    const hasFBX = !!fileBuffer[key]; // 判断是否真的选了模型
+                    const hasFBX = !!fileBuffer[key];
+                    const hasVideo = !!fileBuffer[key + "_video"];
 
                     arr.push({
                         title: t,
                         image: it.querySelector('.prev').src,
-                        model: hasFBX ? `/models/${t}.fbx` : "" // 没选就为空
+                        model: hasFBX ? `models/${t}.fbx` : "",
+                        video: hasVideo ? `models/${t}.mp4` : ""
                     });
                 });
                 menuData.firstMenu[uidx].secondMenu = arr;
@@ -407,34 +425,42 @@
 
         document.getElementById('save').onclick = async function () {
             const tip = document.getElementById('tip');
-            tip.innerText = "⏳ 正在上传FBX到GitHub...";
+            tip.innerText = "⏳ 正在上传文件到GitHub...";
 
-            const allItems = document.querySelectorAll('.item');
             for (let uidx = 0; uidx < menuData.firstMenu.length; uidx++) {
                 const unit = menuData.firstMenu[uidx];
                 for (let idx = 0; idx < unit.secondMenu.length; idx++) {
                     const key = `${uidx}-${idx}`;
-                    const file = fileBuffer[key];
                     const title = unit.secondMenu[idx].title;
+                    if(!title) continue;
 
-                    if (file && title) {
+                    // 上传FBX 到 models
+                    const fbxFile = fileBuffer[key];
+                    if(fbxFile){
                         const base64 = await new Promise((resolve) => {
                             const reader = new FileReader();
-                            reader.onload = function (e) {
-                                const base64Data = e.target.result.split(',')[1];
-                                resolve(base64Data);
-                            };
-                            reader.readAsDataURL(file);
+                            reader.onload = e => resolve(e.target.result.split(',')[1]);
+                            reader.readAsDataURL(fbxFile);
                         });
-
                         await uploadToGitHub(`models/${title}.fbx`, base64, true);
+                    }
+
+                    // 上传视频 到 models，后缀 .mp4
+                    const videoFile = fileBuffer[key + "_video"];
+                    if(videoFile){
+                        const base64 = await new Promise((resolve) => {
+                            const reader = new FileReader();
+                            reader.onload = e => resolve(e.target.result.split(',')[1]);
+                            reader.readAsDataURL(videoFile);
+                        });
+                        await uploadToGitHub(`models/${title}.mp4`, base64, true);
                     }
                 }
             }
 
             const jsonContent = btoa(unescape(encodeURIComponent(getJson())));
             await uploadToGitHub('menu.json', jsonContent);
-            tip.innerText = "✅ 上传完成！Netlify 自动部署中...";
+            tip.innerText = "✅ 上传完成！GitHub Pages 已自动更新";
         };
     </script>
 </body>
