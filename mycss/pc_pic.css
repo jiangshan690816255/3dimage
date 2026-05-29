@@ -1,0 +1,141 @@
+img[src=""],img:not([src]){ opacity:0;}
+
+img.a{
+	position: absolute;
+	left: 5px;
+    top:  50%;
+	transform: translate(0, -50%);
+	width: 25%;
+	border-style:solid;
+	border-color:#ff00ff;
+	border-width:2px;
+	
+	border-radius:3px;
+	-moz-border-radius:3px;
+	-webkit-border-radius:3px;
+	-moz-box-shadow:3px 3px 5px #9933cc;
+	-webkit-box-shadow:3px 3px 5px #9933cc;
+	box-shadow:3px 3px 5px #9933cc;
+}
+
+img.b{
+	position: absolute;
+	right: 0px;
+    bottom:0px;
+}
+
+img.b2{
+	position: absolute;
+	left: 0px;
+    bottom:0px;
+}
+
+
+label.a{
+	position: absolute;
+	top: 5px;
+	left:5px;
+	color: blue;
+	font-size:16px;
+	text-align: left;
+	font-weight: bold;	
+	display:block;	  		
+}
+		
+label.fa{
+	position: absolute;
+	top: 5px;
+	left:5px;
+	color: white;
+	font-size:16px;
+	text-align: left;
+	font-weight: bold;	
+	display:block;	
+}	
+
+
+label.b{
+	position:absolute;
+	bottom:5px; 
+	left:5px;
+	font-size:x-small;
+	text-align:left;
+	color: blue;	
+	font-weight: bold;	
+	display:block;	  		
+}
+
+label.c{
+	position: absolute;
+	top: 10px;
+	left: 10px;
+	color: red;
+	font-size:42px;
+	text-align: left;
+	font-weight: bold;	
+	display: block;	
+    font-family: "隶书";	
+    font-style:italic;
+}
+
+label.c2{
+	position: absolute;
+	top: 160px;
+	left: 10px;
+	color: white;
+	font-size:12px;
+	text-align: left;
+	font-weight: bold;	
+	display: block;	
+}
+
+label.c3{
+	position: absolute;
+	top: 360px;
+	left: 30px;
+	color: red;
+	font-size:16px;
+	text-align: left;
+	font-weight: bold;	
+	font-family: "黑体";	
+	display: block;	
+}
+
+label.d{
+	position:absolute;
+	bottom:5px; 
+	left:5px;
+	font-size:0.6rem;
+	text-align:left;
+	color: white;	
+	font-weight: bold;	
+	display:block;	  		
+}
+
+.viewer {
+    flex: 1;
+    position: absolute;
+	top: 1px;
+    left: 6px;
+    overflow: hidden;
+}
+
+.model-info {
+    background: rgba(0, 0, 0, 0.6);
+    padding: 2px;
+    border-radius: 5px;
+    max-width: 400px;
+ }
+ 
+.model-title {
+    font-size: 1.2rem;
+    margin-bottom: 0px;
+    color: red;
+}	
+        
+.model-desc {
+    font-size: 1.0rem;
+    line-height: 1.5;
+}
+
+p { white-space: pre-line; }   /* 用于文本换行  见  /n 则换行*/

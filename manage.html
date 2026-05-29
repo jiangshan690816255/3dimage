@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>菜单管理（自动上传到GitHub）</title>
+    <style>
+        *{box-sizing:border-box;margin:0;padding:0;font-family:微软雅黑}
+        body{padding:20px;background:#f5f5f5}
+        .box{background:white;padding:20px;margin-bottom:15px;border-radius:8px;box-shadow:0 0 5px #00000010}
+        h1{margin-bottom:20px;color:#333}
+        h3{margin-bottom:10px;color:#333}
+        input{padding:8px;margin:0;border:1px solid #ddd;border-radius:4px}
+        button{background:#409eff;color:white;padding:8px 12px;border:none;border-radius:4px;cursor:pointer}
+        .unit{
+            border-left:4px solid #409eff;
+            padding-left:15px;
+            margin:15px 0;
+            background:#fff;
+            border-radius:6px;
+            overflow:hidden;
+        }
+        .unit-header {
+            display:flex;
+            align-items:center;
+            justify-content:space-between;
+            padding:10px 0;
+        }
+        .header-left {
+            display:flex;
+            align-items:center;
+            gap:10px;
+            cursor:pointer;
+            flex:1;
+        }
+        .unit-content {
+            display:none;
+            padding:10px 0;
+            padding-left:10px;
+        }
+        .item{
+            background:#f9f9f9;
+            padding:10px;
+            margin:6px 0;
+            border-radius:4px;
+            display:flex;
+            align-items:center;
+            gap:12px;
+        }
+        .item-left{
+            display:flex;
+            flex-direction:column;
+            gap:6px;
+            width:50%;
+        }
+        .item-row{
+            display:flex;
+            align-items:center;
+            gap:6px;
+            width:100%;
+        }
+        .item-row label{
+            white-space:nowrap;
+            font-size:14px;
+            color:#333;
+            width:50px;
+        }
+        .item-row input{
+            flex:1;
+        }
+
+        .img-box{
+            display:flex;
+            align-items:center;
+            justify-content:flex-start;
+            gap:4px;
+            width:50%;
+        }
+
+        img.prev{
+            height:74px;
+            aspect-ratio:1/1;
+            object-fit:cover;
+            border:1px solid #ddd;
+            border-radius:4px;
+            cursor:pointer;
+            flex-shrink:0;
+        }
+
+        .fbx-tag {
+            background:#ef4444;
+            color:#fff;
+            font-size:12px;
+            padding:2px 6px;
+            border-radius:4px;
+            display:none;
+            font-weight:bold;
+            white-space:nowrap;
+            flex-shrink:0;
+        }
+        .fbx-tag.show{display:inline-block;}
+
+        .item button{
+            background:#f56c6c!important;
+            padding:12px 20px!important;
+            font-size:16px!important;
+            border:none!important;
+            color:#fff!important;
+            border-radius:4px!important;
+            cursor:pointer!important;
+            flex-shrink:0;
+        }
+
+        .add-item-btn{
+            background:#409eff;
+            color:white;
+            padding:10px 16px;
+            font-size:14px;
+            border:none;
+            border-radius:4px;
+            cursor:pointer;
+            margin-top:8px;
+        }
+
+        #save{background:#00c48c}
+        #copyBtn{background:#1677ff}
+        #addUnitBtn{background:#67c23a}
+        #delUnit{background:#f56c6c;padding:6px 10px;font-size:12px}
+        #tip{color:#00c48c;margin-top:10px}
+
+        .img-modal{
+            position:fixed;top:0;left:0;width:100%;height:100%;
+            background:rgba(0,0,0,0.8);display:none;align-items:center;justify-content:center;z-index:999;
+        }
+        .img-modal.show{display:flex;}
+        .modal-img{max-width:90%;max-height:90%;object-fit:contain;}
+        .close-modal{position:absolute;top:20px;right:30px;color:#fff;font-size:30px;cursor:pointer;}
+    </style>
+</head>
+<body>
+    <h1>菜单管理（上传FBX到GitHub + 自动部署Netlify）</h1>
+    <div class="box">
+        <button id="addUnitBtn">新增一级菜单</button>
+        <button id="copyBtn">复制JSON</button>
+        <button id="save">保存并上传到Git</button>
+        <div id="tip"></div>
+    </div>
+    <div id="editor"></div>
+
+    <div class="img-modal" id="imgModal">
+        <span class="close-modal" onclick="closeImgModal()">×</span>
+        <img class="modal-img" id="modalImg" src="">
+    </div>
+
+    <script>
+        // ====================== 你只需要填这 3 个配置 ======================
+        const CONFIG = {
+            OWNER: "jiangshan690816255",
+            REPO: "3dimage",
+            BRANCH: "main",
+            GITHUB_TOKEN: ""
+        };
+        // ===============================================================
+
+        let menuData;
+        const imgModal = document.getElementById('imgModal');
+        const modalImg = document.getElementById('modalImg');
+        let fileBuffer = {};
+
+        function closeImgModal() {
+            imgModal.classList.remove('show');
+        }
+
+        imgModal.onclick = function(e) {
+            if (e.target === imgModal) {
+                closeImgModal();
+            }
+        };
+
+        // 初始化
+        fetch('./menu.json')
+            .then(res => res.json())
+            .then(data => {
+                menuData = data;
+                render();
+            })
+            .catch(() => {
+                menuData = {
+                    "firstMenu": [{
+                        "id": "unit1",
+                        "name": "新单元",
+                        "secondMenu": [{
+                            "title": "新例题",
+                            "image": "",
+                            "model": ""
+                        }]
+                    }]
+                };
+                render();
+            });
+
+        function render() {
+            const dom = document.getElementById('editor');
+            dom.innerHTML = '';
+
+            menuData.firstMenu.forEach((unit, uidx) => {
+                const u = document.createElement('div');
+                u.className = 'unit';
+                u.innerHTML = `
+                    <div class="unit-header">
+                        <div class="header-left" onclick="toggleUnit(${uidx})">
+                            <span class="fold-icon" id="icon-${uidx}">▶</span>
+                            <h3>一级菜单：<input class="uname" value="${unit.name}" onclick="event.stopPropagation()"></h3>
+                        </div>
+                        <div class="header-btn-group">
+                            <button id="delUnit" onclick="delUnit(${uidx},event)">删除单元</button>
+                        </div>
+                    </div>
+                    <div class="unit-content" id="content-${uidx}">
+                        <div class="items"></div>
+                        <button class="add-item-btn" onclick="addItem(${uidx})">添加例题</button>
+                    </div>
+                `;
+                dom.appendChild(u);
+
+                const items = u.querySelector('.items');
+                unit.secondMenu.forEach((item, idx) => {
+                    const i = document.createElement('div');
+                    i.className = 'item';
+                    i.innerHTML = `
+                        <div class="item-left">
+                            <div class="item-row"><label>标题：</label><input class="title" value="${item.title}"></div>
+                            <div class="item-row"><label>图片：</label><input type="file" class="imgFile"></div>
+                            <div class="item-row"><label>模型：</label><input type="file" class="modelFile" accept=".fbx"></div>
+                        </div>
+                        <div class="img-box">
+                            <img class="prev" src="${item.image}">
+                            <div class="fbx-tag ${item.model ? 'show' : ''}">FBX</div>
+                        </div>
+                        <button onclick="delItem(${uidx},${idx})">删</button>
+                    `;
+                    items.appendChild(i);
+
+                    const prev = i.querySelector('.prev');
+                    const imgFile = i.querySelector('.imgFile');
+                    const modelFile = i.querySelector('.modelFile');
+                    const titleInput = i.querySelector('.title');
+                    const fbxTag = i.querySelector('.fbx-tag');
+                    const key = `${uidx}-${idx}`;
+
+                    prev.onclick = function () {
+                        if (prev.src) {
+                            modalImg.src = prev.src;
+                            imgModal.classList.add('show');
+                        }
+                    };
+
+                    imgFile.onchange = function () {
+                        const f = imgFile.files[0];
+                        if (!f) return;
+                        const reader = new FileReader();
+                        reader.onload = function (e) {
+                            prev.src = e.target.result;
+                        };
+                        reader.readAsDataURL(f);
+                    };
+
+                    modelFile.onchange = function () {
+                        const f = modelFile.files[0];
+                        if (f) {
+                            fileBuffer[key] = f;
+                            fbxTag.classList.add('show');
+                        }
+                    };
+                });
+            });
+        }
+
+        window.toggleUnit = function (uidx) {
+            const c = document.getElementById(`content-${uidx}`);
+            const icon = document.getElementById(`icon-${uidx}`);
+            if (c.style.display === 'block') {
+                c.style.display = 'none';
+                icon.textContent = '▶';
+            } else {
+                c.style.display = 'block';
+                icon.textContent = '▼';
+            }
+        };
+
+        document.getElementById('addUnitBtn').onclick = function () {
+            menuData.firstMenu.push({
+                id: 'unit' + Date.now(),
+                name: "新单元",
+                secondMenu: [{
+                    title: "新例题",
+                    image: "",
+                    model: ""
+                }]
+            });
+            render();
+        };
+
+        window.delUnit = function (uidx, e) {
+            e.stopPropagation();
+            if (menuData.firstMenu.length <= 1) {
+                alert('至少保留一个');
+                return;
+            }
+            if (!confirm('确定删除？')) return;
+            menuData.firstMenu.splice(uidx, 1);
+            render();
+        };
+
+        window.addItem = function (uidx) {
+            menuData.firstMenu[uidx].secondMenu.push({
+                title: "新例题",
+                image: "",
+                model: ""
+            });
+            render();
+            const content = document.getElementById(`content-${uidx}`);
+            const icon = document.getElementById(`icon-${uidx}`);
+            content.style.display = 'block';
+            icon.textContent = '▼';
+        };
+
+        window.delItem = function (uidx, idx) {
+            if (!confirm('确定删除？')) return;
+            delete fileBuffer[`${uidx}-${idx}`];
+            menuData.firstMenu[uidx].secondMenu.splice(idx, 1);
+            render();
+        };
+
+        function getJson() {
+            document.querySelectorAll('.unit').forEach((u, uidx) => {
+                menuData.firstMenu[uidx].name = u.querySelector('.uname').value;
+                const arr = [];
+                u.querySelectorAll('.item').forEach((it, idx) => {
+                    const t = it.querySelector('.title').value.trim();
+                    arr.push({
+                        title: t,
+                        image: it.querySelector('.prev').src,
+                        model: `/models/${t}.fbx`
+                    });
+                });
+                menuData.firstMenu[uidx].secondMenu = arr;
+            });
+            return JSON.stringify(menuData, null, 2);
+        }
+
+        document.getElementById('copyBtn').onclick = function () {
+            navigator.clipboard.writeText(getJson());
+            document.getElementById('tip').innerText = "✅ 已复制JSON";
+        };
+
+        async function uploadToGitHub(path, content, isBase64) {
+            const url = `https://api.github.com/repos/${CONFIG.OWNER}/${CONFIG.REPO}/contents/${path}`;
+            let sha = undefined;
+
+            try {
+                const getRes = await fetch(url, {
+                    headers: {
+                        Authorization: `token ${CONFIG.GITHUB_TOKEN}`
+                    }
+                });
+                if (getRes.ok) {
+                    const data = await getRes.json();
+                    sha = data.sha;
+                }
+            } catch (e) {}
+
+            const body = {
+                message: `Upload ${path}`,
+                branch: CONFIG.BRANCH,
+                content: content
+            };
+            if (sha) {
+                body.sha = sha;
+            }
+
+            return await fetch(url, {
+                method: 'PUT',
+                headers: {
+                    Authorization: `token ${CONFIG.GITHUB_TOKEN}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(body)
+            });
+        }
+
+        document.getElementById('save').onclick = async function () {
+            const tip = document.getElementById('tip');
+            tip.innerText = "⏳ 正在上传FBX到GitHub...";
+
+            const allItems = document.querySelectorAll('.item');
+            for (let uidx = 0; uidx < menuData.firstMenu.length; uidx++) {
+                const unit = menuData.firstMenu[uidx];
+                for (let idx = 0; idx < unit.secondMenu.length; idx++) {
+                    const key = `${uidx}-${idx}`;
+                    const file = fileBuffer[key];
+                    const title = unit.secondMenu[idx].title;
+
+                    if (file && title) {
+                        const base64 = await new Promise((resolve) => {
+                            const reader = new FileReader();
+                            reader.onload = function (e) {
+                                const base64Data = e.target.result.split(',')[1];
+                                resolve(base64Data);
+                            };
+                            reader.readAsDataURL(file);
+                        });
+
+                        await uploadToGitHub(`models/${title}.fbx`, base64, true);
+                    }
+                }
+            }
+
+            const jsonContent = btoa(unescape(encodeURIComponent(getJson())));
+            await uploadToGitHub('menu.json', jsonContent);
+            tip.innerText = "✅ 上传完成！Netlify 自动部署中...";
+        };
+    </script>
+</body>
+</html>
