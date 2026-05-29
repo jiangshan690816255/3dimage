@@ -72,10 +72,14 @@
             display:flex;
             align-items:center;
             justify-content:flex-start;
-            gap:4px;
+            gap:8px;
             width:50%;
         }
 
+        .img-wrap{
+            position:relative;
+            flex-shrink:0;
+        }
         img.prev{
             height:74px;
             aspect-ratio:1/1;
@@ -83,7 +87,49 @@
             border:1px solid #ddd;
             border-radius:4px;
             cursor:pointer;
+            display:block;
+        }
+        .img-tag{
+            position:absolute;
+            top:-4px;
+            right:-4px;
+            background:#1677ff;
+            color:#fff;
+            font-size:12px;
+            padding:2px 4px;
+            border-radius:4px;
+            font-weight:bold;
+            white-space:nowrap;
+        }
+
+        .answer-wrap{
+            position:relative;
             flex-shrink:0;
+        }
+        img.answer-prev{
+            height:74px;
+            aspect-ratio:1/1;
+            object-fit:cover;
+            border:1px solid #ddd;
+            border-radius:4px;
+            cursor:pointer;
+            display:block;
+        }
+        .answer-tag{
+            position:absolute;
+            top:-4px;
+            right:-4px;
+            background:#00c48c;
+            color:#fff;
+            font-size:12px;
+            padding:2px 4px;
+            border-radius:4px;
+            font-weight:bold;
+            white-space:nowrap;
+            display:none;
+        }
+        .answer-tag.show{
+            display:inline-block;
         }
 
         .fbx-tag, .video-tag {
@@ -160,7 +206,6 @@
         };
         // ===============================================================
 
-        // 自动从浏览器读取Token，没有就弹窗输入并记住
         let GITHUB_TOKEN = localStorage.getItem("GITHUB_TOKEN");
         if (!GITHUB_TOKEN || GITHUB_TOKEN === "null" || GITHUB_TOKEN === "undefined") {
             GITHUB_TOKEN = prompt("请输入你的 GitHub Token：", "");
@@ -176,6 +221,7 @@
         const imgModal = document.getElementById('imgModal');
         const modalImg = document.getElementById('modalImg');
         let fileBuffer = {};
+        let answerPreview = {};
 
         function closeImgModal() {
             imgModal.classList.remove('show');
@@ -187,7 +233,6 @@
             }
         };
 
-        // 初始化
         fetch('./menu.json?_=' + Date.now())
             .then(res => res.json())
             .then(data => {
@@ -203,7 +248,8 @@
                             "title": "新例题",
                             "image": "",
                             "model": "",
-                            "video": ""
+                            "video": "",
+                            "answer": ""
                         }]
                     }]
                 };
@@ -236,17 +282,27 @@
 
                 const items = u.querySelector('.items');
                 unit.secondMenu.forEach((item, idx) => {
+                    const key = `${uidx}-${idx}`;
+                    const ansSrc = answerPreview[key] || item.answer;
                     const i = document.createElement('div');
                     i.className = 'item';
                     i.innerHTML = `
                         <div class="item-left">
                             <div class="item-row"><label>标题：</label><input class="title" value="${item.title}"></div>
                             <div class="item-row"><label>图片：</label><input type="file" class="imgFile"></div>
+                            <div class="item-row"><label>答案：</label><input type="file" class="answerFile"></div>
                             <div class="item-row"><label>视频：</label><input type="file" class="videoFile" accept="video/*"></div>
                             <div class="item-row"><label>模型：</label><input type="file" class="modelFile" accept=".fbx"></div>
                         </div>
                         <div class="img-box">
-                            <img class="prev" src="${item.image}">
+                            <div class="img-wrap">
+                                <img class="prev" src="${item.image}">
+                                <div class="img-tag">教学图</div>
+                            </div>
+                            <div class="answer-wrap">
+                                <img class="answer-prev" src="${ansSrc}">
+                                <div class="answer-tag ${item.answer ? 'show' : ''}">答案</div>
+                            </div>
                             <div class="video-tag ${item.video ? 'show' : ''}">视频</div>
                             <div class="fbx-tag ${item.model ? 'show' : ''}">FBX</div>
                         </div>
@@ -255,17 +311,24 @@
                     items.appendChild(i);
 
                     const prev = i.querySelector('.prev');
+                    const answerPrev = i.querySelector('.answer-prev');
                     const imgFile = i.querySelector('.imgFile');
+                    const answerFile = i.querySelector('.answerFile');
                     const modelFile = i.querySelector('.modelFile');
                     const videoFile = i.querySelector('.videoFile');
-                    const titleInput = i.querySelector('.title');
                     const fbxTag = i.querySelector('.fbx-tag');
                     const videoTag = i.querySelector('.video-tag');
-                    const key = `${uidx}-${idx}`;
+                    const answerTag = i.querySelector('.answer-tag');
 
                     prev.onclick = function () {
                         if (prev.src) {
                             modalImg.src = prev.src;
+                            imgModal.classList.add('show');
+                        }
+                    };
+                    answerPrev.onclick = function () {
+                        if (answerPrev.src) {
+                            modalImg.src = answerPrev.src;
                             imgModal.classList.add('show');
                         }
                     };
@@ -280,13 +343,27 @@
                         reader.readAsDataURL(f);
                     };
 
+                    answerFile.onchange = function(){
+                        const f = answerFile.files[0];
+                        if(f){
+                            fileBuffer[key + "_answer"] = f;
+                            answerTag.classList.add('show');
+                            const reader = new FileReader();
+                            reader.onload = e => {
+                                answerPreview[key] = e.target.result;
+                                answerPrev.src = e.target.result;
+                            };
+                            reader.readAsDataURL(f);
+                        }
+                    };
+
                     videoFile.onchange = function(){
                         const f = videoFile.files[0];
                         if(f){
                             fileBuffer[key + "_video"] = f;
                             videoTag.classList.add('show');
                         }
-                    }
+                    };
 
                     modelFile.onchange = function () {
                         const f = modelFile.files[0];
@@ -319,7 +396,8 @@
                     title: "新例题",
                     image: "",
                     model: "",
-                    video: ""
+                    video: "",
+                    answer: ""
                 }]
             });
             render();
@@ -341,7 +419,8 @@
                 title: "新例题",
                 image: "",
                 model: "",
-                video: ""
+                video: "",
+                answer: ""
             });
             render();
             const content = document.getElementById(`content-${uidx}`);
@@ -350,17 +429,18 @@
             icon.textContent = '▼';
         };
 
-        // 删除例题，不折叠菜单
         window.delItem = function (uidx, idx, btnEl) {
             if (!confirm('确定删除？')) return;
-            delete fileBuffer[`${uidx}-${idx}`];
-            delete fileBuffer[`${uidx}-${idx}_video`];
+            const key = `${uidx}-${idx}`;
+            delete fileBuffer[key];
+            delete fileBuffer[key + "_video"];
+            delete fileBuffer[key + "_answer"];
+            delete answerPreview[key];
             menuData.firstMenu[uidx].secondMenu.splice(idx, 1);
             const itemEl = btnEl.closest('.item');
             if (itemEl) itemEl.remove();
         };
 
-        // 生成JSON路径配置
         function getJson() {
             document.querySelectorAll('.unit').forEach((u, uidx) => {
                 menuData.firstMenu[uidx].name = u.querySelector('.uname').value;
@@ -370,13 +450,26 @@
                     const key = `${uidx}-${idx}`;
                     const hasFBX = !!fileBuffer[key];
                     const hasVideo = !!fileBuffer[key + "_video"];
+                    const hasAnswer = !!fileBuffer[key + "_answer"];
 
-                    arr.push({
+                    const itemData = {
                         title: t,
                         image: it.querySelector('.prev').src,
-                        model: hasFBX ? `models/${t}.fbx` : "",
-                        video: hasVideo ? `models/${t}.mp4` : ""
-                    });
+                        model: "",
+                        video: "",
+                        answer: ""
+                    };
+
+                    if (hasFBX) itemData.model = `models/${t}.fbx`;
+                    else itemData.model = menuData.firstMenu[uidx].secondMenu[idx]?.model || "";
+
+                    if (hasVideo) itemData.video = `models/${t}.mp4`;
+                    else itemData.video = menuData.firstMenu[uidx].secondMenu[idx]?.video || "";
+
+                    if (hasAnswer) itemData.answer = `models/${t}_answer.${fileBuffer[key+"_answer"].name.split('.').pop()}`;
+                    else itemData.answer = menuData.firstMenu[uidx].secondMenu[idx]?.answer || "";
+
+                    arr.push(itemData);
                 });
                 menuData.firstMenu[uidx].secondMenu = arr;
             });
@@ -394,9 +487,7 @@
 
             try {
                 const getRes = await fetch(url, {
-                    headers: {
-                        Authorization: `token ${GITHUB_TOKEN}`
-                    }
+                    headers: { Authorization: `token ${GITHUB_TOKEN}` }
                 });
                 if (getRes.ok) {
                     const data = await getRes.json();
@@ -409,9 +500,7 @@
                 branch: CONFIG.BRANCH,
                 content: content
             };
-            if (sha) {
-                body.sha = sha;
-            }
+            if (sha) body.sha = sha;
 
             return await fetch(url, {
                 method: 'PUT',
@@ -434,7 +523,6 @@
                     const title = unit.secondMenu[idx].title;
                     if(!title) continue;
 
-                    // 上传FBX 到 models
                     const fbxFile = fileBuffer[key];
                     if(fbxFile){
                         const base64 = await new Promise((resolve) => {
@@ -445,7 +533,6 @@
                         await uploadToGitHub(`models/${title}.fbx`, base64, true);
                     }
 
-                    // 上传视频 到 models，后缀 .mp4
                     const videoFile = fileBuffer[key + "_video"];
                     if(videoFile){
                         const base64 = await new Promise((resolve) => {
@@ -454,6 +541,18 @@
                             reader.readAsDataURL(videoFile);
                         });
                         await uploadToGitHub(`models/${title}.mp4`, base64, true);
+                    }
+
+                    const answerFile = fileBuffer[key + "_answer"];
+                    if(answerFile){
+                        const ext = answerFile.name.split('.').pop();
+                        const fileName = `${title}_answer.${ext}`;
+                        const base64 = await new Promise((resolve) => {
+                            const reader = new FileReader();
+                            reader.onload = e => resolve(e.target.result.split(',')[1]);
+                            reader.readAsDataURL(answerFile);
+                        });
+                        await uploadToGitHub(`models/${fileName}`, base64, true);
                     }
                 }
             }
