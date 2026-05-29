@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <title>菜单管理（自动上传到GitHub）</title>
+    <title>菜单管理（上传FBX到GitHub + 自动部署Netlify）</title>
     <style>
         *{box-sizing:border-box;margin:0;padding:0;font-family:微软雅黑}
         body{padding:20px;background:#f5f5f5}
@@ -152,14 +152,25 @@
     </div>
 
     <script>
-        // ====================== 你只需要填这 3 个配置 ======================
+        // ====================== 固定配置（无Token）======================
         const CONFIG = {
             OWNER: "jiangshan690816255",
             REPO: "3dimage",
-            BRANCH: "main",
-            GITHUB_TOKEN: ""
+            BRANCH: "main"
         };
         // ===============================================================
+
+        // 自动从浏览器读取Token，没有就弹窗输入并记住
+        let GITHUB_TOKEN = localStorage.getItem("GITHUB_TOKEN");
+        if (!GITHUB_TOKEN || GITHUB_TOKEN === "null" || GITHUB_TOKEN === "undefined") {
+            GITHUB_TOKEN = prompt("请输入你的 GitHub Token：", "");
+            if (GITHUB_TOKEN) {
+                localStorage.setItem("GITHUB_TOKEN", GITHUB_TOKEN);
+                alert("✅ Token 已保存，下次无需重新输入");
+            } else {
+                alert("❌ 未输入Token，无法上传到Git");
+            }
+        }
 
         let menuData;
         const imgModal = document.getElementById('imgModal');
@@ -360,7 +371,7 @@
             try {
                 const getRes = await fetch(url, {
                     headers: {
-                        Authorization: `token ${CONFIG.GITHUB_TOKEN}`
+                        Authorization: `token ${GITHUB_TOKEN}`
                     }
                 });
                 if (getRes.ok) {
@@ -381,7 +392,7 @@
             return await fetch(url, {
                 method: 'PUT',
                 headers: {
-                    Authorization: `token ${CONFIG.GITHUB_TOKEN}`,
+                    Authorization: `token ${GITHUB_TOKEN}`,
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify(body)
