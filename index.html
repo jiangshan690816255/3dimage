@@ -13,64 +13,146 @@
     }
 
     body {
-      display: flex;
-      height: 100vh;
-      overflow: hidden;
       background: #f7f8fc;
     }
 
-    /* 左侧一级菜单 */
+    .container {
+      display: flex;
+      min-height: 100vh;
+    }
+
+    /* 左侧菜单 */
     .first-menu {
       width: 240px;
-      background: #ffffff;
+      background: #fff;
       border-right: 1px solid #e8e8ef;
-      height: 100vh;
-      padding: 24px 0;
-      box-shadow: 2px 0 8px rgba(0, 0, 0, 0.04);
+      flex-shrink: 0;
+      position: relative;
+      transition: width 0.3s ease;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* 折叠后宽度 */
+    .first-menu.collapsed {
+      width: 70px;
+    }
+
+    /* 折叠按钮：固定在菜单顶部，手机电脑都可见 */
+    .collapse-btn {
+      background: #6366f1;
+      color: #fff;
+      border: none;
+      padding: 10px 0;
+      width: 100%;
+      cursor: pointer;
+      font-size: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+    .collapse-btn:hover {
+      background: #4f46e5;
+    }
+
+    /* 手机端 */
+    @media (max-width: 768px) {
+      .container {
+        flex-direction: column;
+      }
+      .first-menu {
+        width: 100%;
+        border-right: none;
+        border-bottom: 1px solid #e8e8ef;
+        flex-shrink: 1;
+      }
+      .first-menu.collapsed {
+        width: 100%;
+      }
+      .menu-items {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px;
+        padding: 8px;
+      }
+      .first-menu.collapsed .menu-items {
+        display: none;
+      }
+      .first-item {
+        display: inline-block;
+        margin: 0;
+        padding: 8px 12px;
+        font-size: 14px;
+        border-radius: 6px;
+      }
+    }
+
+    .menu-items {
+      padding: 12px 0;
+      flex: 1;
     }
 
     .first-item {
-      padding: 16px 28px;
-      font-size: 16px;
-      cursor: pointer;
-      transition: all 0.25s ease;
-      border-radius: 8px;
+      display: block;
+      width: calc(100% - 24px);
       margin: 4px 12px;
+      padding: 14px 20px;
+      font-size: 15px;
+      cursor: pointer;
+      border-radius: 8px;
       color: #333;
+      transition: all 0.25s ease;
+      white-space: nowrap;
+      overflow: hidden;
+    }
+
+    /* 电脑端折叠效果 */
+    @media (min-width: 769px) {
+      .first-menu.collapsed .first-item:not(.active) {
+        height: 0;
+        padding: 0;
+        margin: 0;
+        opacity: 0;
+        visibility: hidden;
+      }
     }
 
     .first-item.active {
       background: #6366f1;
       color: #fff;
       font-weight: 500;
-      box-shadow: 0 2px 6px rgba(99, 102, 241, 0.3);
     }
-
     .first-item:hover:not(.active) {
       background: #f1f5ff;
       color: #4f46e5;
     }
 
-    /* 右侧内容 */
+    /* 内容区 */
     .content {
       flex: 1;
-      height: 100vh;
-      background: #f7f8fc;
-      padding: 40px 32px;
-      overflow-y: auto;
+      padding: 24px 16px;
+      width: 100%;
     }
-
     .content-title {
-      font-size: 24px;
+      font-size: 20px;
       font-weight: 600;
       color: #1f2937;
-      margin-bottom: 28px;
+      margin-bottom: 20px;
+      text-align: center;
     }
 
     .second-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-      gap: 20px;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 16px;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    @media (max-width: 500px) {
+      .second-grid {
+        grid-template-columns: 1fr;
+      }
     }
 
     .second-item {
@@ -78,53 +160,41 @@
       align-items: center;
       background: #fff;
       border-radius: 14px;
-      padding: 16px;
-      box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+      padding: 14px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.06);
       transition: all 0.25s ease;
       cursor: pointer;
       border: 1px solid #f0f0f0;
-      position: relative;
     }
-
-    .second-item:hover {
-      transform: translateY(-4px);
-      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
-      border-color: #dcdcfc;
-    }
-
     .second-item img {
-      width: 100px;
-      height: 100px;
+      width: 80px;
+      height: 80px;
       object-fit: cover;
       border-radius: 10px;
-      margin-right: 16px;
-      border: 1px solid #eee;
+      margin-right: 14px;
+      flex-shrink: 0;
     }
-
     .second-item span {
-      font-size: 17px;
+      font-size: 15px;
       font-weight: 500;
       color: #222;
       flex: 1;
-      line-height: 1.4;
+      line-height: 1.3;
     }
 
-    /* 视频播放图标 */
     .play-icon {
-      width: 36px;
-      height: 36px;
+      width: 34px;
+      height: 34px;
       background: #ef4444;
       border-radius: 50%;
       display: flex;
       align-items: center;
       justify-content: center;
       color: #fff;
-      font-size: 16px;
+      font-size: 15px;
       cursor: pointer;
-      margin-left: 8px;
-      transition: 0.2s;
       flex-shrink: 0;
-      z-index: 10;
+      transition: 0.2s;
     }
     .play-icon:hover {
       background: #dc2626;
@@ -144,18 +214,19 @@
       left: 0;
       width: 100%;
       height: 100%;
-      background: rgba(0,0,0,0.85);
+      background: rgba(0,0,0,0.9);
       z-index: 9999;
       display: none;
       align-items: center;
       justify-content: center;
+      padding: 20px;
     }
     .video-modal.show {
       display: flex;
     }
     .video-box {
-      width: 80%;
-      max-width: 1000px;
+      width: 100%;
+      max-width: 900px;
       position: relative;
     }
     .video-box video {
@@ -165,34 +236,35 @@
     }
     .close-video {
       position: absolute;
-      top: -40px;
+      top: -45px;
       right: 0;
       color: #fff;
-      font-size: 28px;
+      font-size: 26px;
       cursor: pointer;
-      background: rgba(0,0,0,0.4);
-      width: 40px;
-      height: 40px;
+      background: rgba(0,0,0,0.5);
+      width: 38px;
+      height: 38px;
       border-radius: 50%;
       display: flex;
       align-items: center;
       justify-content: center;
     }
-
-    /* 滚动条美化 */
-    .content::-webkit-scrollbar {
-      width: 6px;
-    }
-    .content::-webkit-scrollbar-thumb {
-      background: #ddd;
-      border-radius: 10px;
-    }
   </style>
 </head>
 
 <body>
-  <div class="first-menu" id="firstMenu"></div>
-  <div class="content" id="contentArea"></div>
+  <div class="container">
+    <div class="first-menu" id="firstMenu">
+      <!-- 折叠按钮：固定在菜单顶部，手机电脑都可见 -->
+      <button class="collapse-btn" id="collapseBtn">
+        <span id="btnIcon">☰</span>
+        <span id="btnText">折叠菜单</span>
+      </button>
+      <div class="menu-items" id="menuItems"></div>
+    </div>
+
+    <div class="content" id="contentArea"></div>
+  </div>
 
   <!-- 视频弹窗 -->
   <div class="video-modal" id="videoModal">
@@ -205,26 +277,35 @@
   <script>
     const videoModal = document.getElementById('videoModal');
     const videoPlayer = document.getElementById('videoPlayer');
+    const firstMenu = document.getElementById('firstMenu');
+    const collapseBtn = document.getElementById('collapseBtn');
+    const btnIcon = document.getElementById('btnIcon');
+    const btnText = document.getElementById('btnText');
+    const menuItems = document.getElementById('menuItems');
 
-    // 关闭视频
+    // 折叠/展开菜单
+    collapseBtn.onclick = () => {
+      firstMenu.classList.toggle('collapsed');
+      const isCollapsed = firstMenu.classList.contains('collapsed');
+      btnIcon.textContent = isCollapsed ? '☰' : '✕';
+      btnText.textContent = isCollapsed ? '展开菜单' : '折叠菜单';
+    };
+
     function closeVideo() {
       videoPlayer.pause();
       videoModal.classList.remove('show');
     }
 
-    // 点击遮罩关闭
     videoModal.onclick = (e) => {
       if (e.target === videoModal) closeVideo();
     }
 
-    // 播放视频：读取 models/标题名称.mp4
     function playVideo(title) {
       const videoUrl = `models/${title}.mp4`;
       videoPlayer.src = videoUrl;
       videoModal.classList.add('show');
     }
 
-    // 加载菜单
     async function loadMenu() {
       const res = await fetch('./menu.json?_=' + Date.now());
       const data = await res.json();
@@ -232,8 +313,7 @@
     }
 
     function renderFirstMenu(list) {
-      const dom = document.getElementById('firstMenu');
-      dom.innerHTML = '';
+      menuItems.innerHTML = '';
 
       list.forEach((item, index) => {
         const div = document.createElement('div');
@@ -245,7 +325,7 @@
           div.classList.add('active');
           renderSecondMenu(item.secondMenu);
         };
-        dom.appendChild(div);
+        menuItems.appendChild(div);
       });
       renderSecondMenu(list[0].secondMenu);
     }
