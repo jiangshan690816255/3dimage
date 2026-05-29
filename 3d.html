@@ -4,7 +4,7 @@
     <title>三视图</title>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
-    <link type="text/css" rel="stylesheet" href="../mycss/myhtml.css" />
+    <link type="text/css" rel="stylesheet" href="mycss/myhtml.css" />
     <style>
         #titleLabel {
             position: fixed;
@@ -26,11 +26,11 @@
     <label class="b" id="test2">黄先生</label>
     <div id="titleLabel"></div>
 
-    <script src="../libs/three.js"></script>
-    <script src="../libs/inflate.min.js"></script>
-    <script src="../libs/dat.gui.min.js"></script>
-    <script src="../libs/FBXLoader.js"></script>
-    <script src="../libs/OrbitControls.js"></script>
+    <script src="libs/three.js"></script>
+    <script src="libs/inflate.min.js"></script>
+    <script src="libs/dat.gui.min.js"></script>
+    <script src="libs/FBXLoader.js"></script>
+    <script src="libs/OrbitControls.js"></script>
 
     <script type="text/javascript">
         const params = new URLSearchParams(window.location.search);
@@ -43,9 +43,9 @@
 
         var sUserAgent = navigator.userAgent.toLowerCase();
         if (/ipad|iphone|midp|rv:1.2.3.4|ucweb|android|windows ce|mobile/.test(sUserAgent)) {
-            document.write('<link type="text/css" rel="stylesheet" href="../mycss/mobile_pic.css" />');
+            document.write('<link type="text/css" rel="stylesheet" href="mycss/mobile_pic.css" />');
         } else {
-            document.write('<link type="text/css" rel="stylesheet" href="../mycss/pc_pic.css" />');
+            document.write('<link type="text/css" rel="stylesheet" href="mycss/pc_pic.css" />');
         }
 
         var container, controls;
