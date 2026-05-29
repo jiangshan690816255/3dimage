@@ -124,6 +124,7 @@
       margin-left: 8px;
       transition: 0.2s;
       flex-shrink: 0;
+      z-index: 10;
     }
     .play-icon:hover {
       background: #dc2626;
@@ -216,10 +217,9 @@
       if (e.target === videoModal) closeVideo();
     }
 
-    // 播放视频（这里你可以换成自己的视频地址）
+    // 播放视频：读取 models/标题名称.mp4
     function playVideo(title) {
-      // 你可以根据 title 匹配不同视频
-      const videoUrl = "https://www.w3school.com.cn/i/movie.mp4"; // 示例视频
+      const videoUrl = `models/${title}.mp4`;
       videoPlayer.src = videoUrl;
       videoModal.classList.add('show');
     }
@@ -269,7 +269,7 @@
           <div class="second-item">
             <img src="${item.image}" alt="${item.title}">
             <span>${item.title}</span>
-            <div class="play-icon" onclick="event.preventDefault(); playVideo('${item.title}')">▶</div>
+            <div class="play-icon" onclick="event.stopPropagation();event.preventDefault();playVideo('${item.title}')">▶</div>
           </div>
         `;
         grid.appendChild(a);
