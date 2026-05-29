@@ -3,32 +3,74 @@
 <head>
     <title>三视图</title>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
-    <link type="text/css" rel="stylesheet" href="mycss/myhtml.css" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        html, body {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background: #aaaaaa;
+        }
+        /* 顶部标题 */
         #titleLabel {
             position: fixed;
             top: 10px;
             left: 50%;
             transform: translateX(-50%);
             color: white;
-            font-size: 22px;
+            font-size: 18px;
             font-weight: bold;
-            background: rgba(0,0,0,0.5);
-            padding: 8px 16px;
-            border-radius: 6px;
-            z-index: 999;
+            background: rgba(0,0,0,0.7);
+            padding: 8px 14px;
+            border-radius: 8px;
+            z-index: 999999;
+            pointer-events: none;
+            white-space: nowrap;
+        }
+        /* 底部复位按钮 */
+        #resetBtn {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 10px 24px;
+            font-size: 16px;
+            background: rgba(0, 0, 0, 0.6);
+            color: #fff;
+            border: none;
+            border-radius: 20px;
+            cursor: pointer;
+            z-index: 999999;
+        }
+        #resetBtn:hover {
+            background: rgba(0, 0, 0, 0.8);
+        }
+        /* 移动端适配 */
+        @media (max-width: 768px) {
+            #titleLabel {
+                font-size: 16px;
+                padding: 6px 12px;
+                top: 8px;
+            }
+            #resetBtn {
+                padding: 8px 20px;
+                font-size: 15px;
+                bottom: 15px;
+            }
         }
     </style>
 </head>
 <body>
-    <label class="a" id="test"> 3d </label>
-    <label class="b" id="test2">黄先生</label>
     <div id="titleLabel"></div>
+    <button id="resetBtn">复位</button>
 
     <script src="libs/three.js"></script>
     <script src="libs/inflate.min.js"></script>
-    <script src="libs/dat.gui.min.js"></script>
     <script src="libs/FBXLoader.js"></script>
     <script src="libs/OrbitControls.js"></script>
 
@@ -36,22 +78,12 @@
         const params = new URLSearchParams(window.location.search);
         const currentTitle = params.get('title') || '例题1';
         document.getElementById('titleLabel').innerText = currentTitle;
-        // ==============================================
-        // 🔥 直接拼接路径，无映射、无配置
-        // ==============================================
-        const currentFbx = `models/${currentTitle}.fbx`;
 
-        var sUserAgent = navigator.userAgent.toLowerCase();
-        if (/ipad|iphone|midp|rv:1.2.3.4|ucweb|android|windows ce|mobile/.test(sUserAgent)) {
-            document.write('<link type="text/css" rel="stylesheet" href="mycss/mobile_pic.css" />');
-        } else {
-            document.write('<link type="text/css" rel="stylesheet" href="mycss/pc_pic.css" />');
-        }
+        const currentFbx = `models/${currentTitle}.fbx`;
 
         var container, controls;
         var camera, scene, renderer;
         var objects = [];
-        var ToolCtrl;
         var group2 = new THREE.Group(), group3 = new THREE.Group();
 
         var path = [
@@ -59,34 +91,43 @@
             currentFbx
         ];
 
-        var text = [
-            "三视图特性(展开之后):</br>",
-            "(1)、三个视图的位置关系是：俯视图在主视图正下方，左视图在主视图正右方；</br>(2)、三个视图的尺寸关系是：长对正、宽相等、高平齐。",
-        ];
-
         init();
         animate();
 
+        // 复位函数
+        function reset() {
+            let model = scene.getObjectByName("a12");
+            if (model) {
+                fitCameraToObject(camera, controls, model);
+            }
+        }
+        // 绑定按钮点击事件
+        document.getElementById('resetBtn').addEventListener('click', reset);
+
         function init() {
             container = document.createElement('div');
+            container.style.position = 'absolute';
+            container.style.left = '0';
+            container.style.top = '0';
+            container.style.width = '100%';
+            container.style.height = '100%';
             document.body.appendChild(container);
 
-            renderer = new THREE.WebGLRenderer({ antialias: true });
-            renderer.setPixelRatio(window.devicePixelRatio);
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
             renderer.setSize(window.innerWidth, window.innerHeight);
             renderer.shadowMap.enabled = false;
             container.appendChild(renderer.domElement);
+
             window.addEventListener('resize', onWindowResize, false);
 
             scene = new THREE.Scene();
             scene.background = new THREE.Color(0xaaaaaa);
 
-            camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 1, 2000);
+            camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 3000);
             controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
 
-            // ==========================
-            // 🔥 灯光恢复原版亮度 0.7
-            // ==========================
             var light = new THREE.HemisphereLight(0xffffff, 0x444444, 0.7);
             light.position.set(0, 300, 0);
             scene.add(light);
@@ -101,26 +142,6 @@
 
             loadmodel2(path[0], "a11");
             loadmodel2(path[1], "a12");
-
-            ToolCtrl = new function () {
-                this.flag2 = true;
-                this.fxwReset = function () { reset(); };
-                document.getElementById("test").innerHTML = text[0] + text[1];
-            };
-
-            var gui = new dat.GUI({ width: 220 });
-            gui.add(ToolCtrl, 'flag2').name("模型显示").onChange(e => showmodel(e));
-            gui.add(ToolCtrl, 'fxwReset').name("复位（居中）");
-        }
-
-        function reset() {
-            ToolCtrl.flag2 = true;
-            showmodel(true);
-
-            let model = scene.getObjectByName("a12");
-            if (model) {
-                fitCameraToObject(camera, controls, model);
-            }
         }
 
         function fitCameraToObject(camera, controls, object, offset = 1.8) {
@@ -165,28 +186,16 @@
                 object0.position.sub(center);
                 object0.position.add(new THREE.Vector3(83, -64, -64));
 
-                object0.traverse(child => {
-                    if (child.isMesh) child.visible = true;
-                });
+                object0.traverse(child => { if (child.isMesh) child.visible = true; });
 
                 if (str === "a12") {
                     objects = [];
-                    object0.traverse(child => {
-                        if (child.isMesh) objects.push(child);
-                    });
+                    object0.traverse(child => { if (child.isMesh) objects.push(child); });
                 }
 
                 object0.name = str;
                 scene.add(object0);
                 fitCameraToObject(camera, controls, object0);
-            });
-        }
-
-        function showmodel(flag) {
-            let model = scene.getObjectByName("a12");
-            if (model) model.visible = flag;
-            objects.forEach(obj => {
-                if (obj) obj.visible = flag;
             });
         }
 
