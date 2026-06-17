@@ -132,18 +132,28 @@
             display:inline-block;
         }
 
-        .fbx-tag, .video-tag {
-            font-size:12px;
-            padding:2px 6px;
-            border-radius:4px;
-            display:none;
-            font-weight:bold;
-            white-space:nowrap;
-            flex-shrink:0;
+        .video-wrap, .model-wrap {
+            position: relative;
+            flex-shrink: 0;
+            display: none;
         }
-        .fbx-tag {background:#ef4444;color:#fff;}
-        .video-tag {background:#1677ff;color:#fff;}
-        .fbx-tag.show, .video-tag.show{display:inline-block;}
+        .video-wrap.show, .model-wrap.show {
+            display: block;
+        }
+        .video-icon, .model-icon {
+            height: 74px;
+            aspect-ratio: 1/1;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 28px;
+            background: #fafafa;
+            color: #999;
+        }
+        .video-wrap .img-tag { background: #1677ff; position: absolute; top: -4px; right: -4px; }
+        .model-wrap .img-tag { background: #ef4444; position: absolute; top: -4px; right: -4px; }
 
         .item button{
             background:#f56c6c!important;
@@ -222,6 +232,38 @@
         const modalImg = document.getElementById('modalImg');
         let fileBuffer = {};
         let answerPreview = {};
+        let cosUrls = {}; // 存储 COS 上传后的 URL，key -> { image?, model?, video?, answer? }
+
+        // 上传文件到 COS
+        async function uploadFileToCOS(file, category, itemKey) {
+            const fd = new FormData();
+            const ext = file.name.split('.').pop();
+            const safeName = Date.now() + '_' + Math.random().toString(36).slice(2, 8) + '.' + ext;
+            fd.append('file', file);
+            fd.append('key', 'uploads/' + safeName);
+            try {
+                const res = await fetch('/upload', { method: 'POST', body: fd });
+                const data = await res.json();
+                if (data.success) {
+                    if (!cosUrls[itemKey]) cosUrls[itemKey] = {};
+                    cosUrls[itemKey][category] = data.url;
+                    console.log(`✅ ${category} 上传成功:`, data.url);
+                    return data;
+                }
+            } catch (e) {
+                console.error('上传失败:', e);
+            }
+            return null;
+        }
+
+        // 通过 COS URL 获取本地预览 blob URL
+        async function previewFromCOS(cosUrl) {
+            const urlObj = new URL(cosUrl);
+            const cosKey = urlObj.pathname.substring(1);
+            const previewRes = await fetch('/preview?key=' + encodeURIComponent(cosKey));
+            const blob = await previewRes.blob();
+            return URL.createObjectURL(blob);
+        }
 
         function closeImgModal() {
             imgModal.classList.remove('show');
@@ -303,8 +345,14 @@
                                 <img class="answer-prev" src="${ansSrc}">
                                 <div class="answer-tag ${item.answer ? 'show' : ''}">答案</div>
                             </div>
-                            <div class="video-tag ${item.video ? 'show' : ''}">视频</div>
-                            <div class="fbx-tag ${item.model ? 'show' : ''}">FBX</div>
+                            <div class="video-wrap ${item.video ? 'show' : ''}">
+                                <div class="video-icon">▶</div>
+                                <div class="img-tag">视频</div>
+                            </div>
+                            <div class="model-wrap ${item.model ? 'show' : ''}">
+                                <div class="model-icon">3D</div>
+                                <div class="img-tag">模型</div>
+                            </div>
                         </div>
                         <button onclick="delItem(${uidx},${idx}, this)">删</button>
                     `;
@@ -316,8 +364,8 @@
                     const answerFile = i.querySelector('.answerFile');
                     const modelFile = i.querySelector('.modelFile');
                     const videoFile = i.querySelector('.videoFile');
-                    const fbxTag = i.querySelector('.fbx-tag');
-                    const videoTag = i.querySelector('.video-tag');
+                    const fbxWrap = i.querySelector('.model-wrap');
+                    const videoWrap = i.querySelector('.video-wrap');
                     const answerTag = i.querySelector('.answer-tag');
 
                     prev.onclick = function () {
@@ -333,44 +381,40 @@
                         }
                     };
 
-                    imgFile.onchange = function () {
+                    imgFile.onchange = async function () {
                         const f = imgFile.files[0];
                         if (!f) return;
-                        const reader = new FileReader();
-                        reader.onload = function (e) {
-                            prev.src = e.target.result;
-                        };
-                        reader.readAsDataURL(f);
+                        const result = await uploadFileToCOS(f, 'image', key);
+                        if (result && result.url) {
+                            prev.src = await previewFromCOS(result.url);
+                        }
                     };
 
-                    answerFile.onchange = function(){
+                    answerFile.onchange = async function () {
                         const f = answerFile.files[0];
-                        if(f){
-                            fileBuffer[key + "_answer"] = f;
-                            answerTag.classList.add('show');
-                            const reader = new FileReader();
-                            reader.onload = e => {
-                                answerPreview[key] = e.target.result;
-                                answerPrev.src = e.target.result;
-                            };
-                            reader.readAsDataURL(f);
+                        if (!f) return;
+                        fileBuffer[key + "_answer"] = f;
+                        answerTag.classList.add('show');
+                        const result = await uploadFileToCOS(f, 'answer', key);
+                        if (result && result.url) {
+                            answerPrev.src = await previewFromCOS(result.url);
                         }
                     };
 
-                    videoFile.onchange = function(){
+                    videoFile.onchange = async function () {
                         const f = videoFile.files[0];
-                        if(f){
-                            fileBuffer[key + "_video"] = f;
-                            videoTag.classList.add('show');
-                        }
+                        if (!f) return;
+                        fileBuffer[key + "_video"] = f;
+                        videoWrap.classList.add('show');
+                        await uploadFileToCOS(f, 'video', key);
                     };
 
-                    modelFile.onchange = function () {
+                    modelFile.onchange = async function () {
                         const f = modelFile.files[0];
-                        if (f) {
-                            fileBuffer[key] = f;
-                            fbxTag.classList.add('show');
-                        }
+                        if (!f) return;
+                        fileBuffer[key] = f;
+                        fbxWrap.classList.add('show');
+                        await uploadFileToCOS(f, 'model', key);
                     };
                 });
             });
@@ -454,20 +498,35 @@
 
                     const itemData = {
                         title: t,
-                        image: it.querySelector('.prev').src,
+                        image: (cosUrls[key] && cosUrls[key].image) || it.querySelector('.prev').src,
                         model: "",
                         video: "",
                         answer: ""
                     };
 
-                    if (hasFBX) itemData.model = `models/${t}.fbx`;
-                    else itemData.model = menuData.firstMenu[uidx].secondMenu[idx]?.model || "";
+                    if (cosUrls[key] && cosUrls[key].model) {
+                        itemData.model = cosUrls[key].model;
+                    } else if (hasFBX) {
+                        itemData.model = `models/${t}.fbx`;
+                    } else {
+                        itemData.model = menuData.firstMenu[uidx].secondMenu[idx]?.model || "";
+                    }
 
-                    if (hasVideo) itemData.video = `models/${t}.mp4`;
-                    else itemData.video = menuData.firstMenu[uidx].secondMenu[idx]?.video || "";
+                    if (cosUrls[key] && cosUrls[key].video) {
+                        itemData.video = cosUrls[key].video;
+                    } else if (hasVideo) {
+                        itemData.video = `models/${t}.mp4`;
+                    } else {
+                        itemData.video = menuData.firstMenu[uidx].secondMenu[idx]?.video || "";
+                    }
 
-                    if (hasAnswer) itemData.answer = `models/${t}_answer.${fileBuffer[key+"_answer"].name.split('.').pop()}`;
-                    else itemData.answer = menuData.firstMenu[uidx].secondMenu[idx]?.answer || "";
+                    if (cosUrls[key] && cosUrls[key].answer) {
+                        itemData.answer = cosUrls[key].answer;
+                    } else if (hasAnswer) {
+                        itemData.answer = `models/${t}_answer.${fileBuffer[key+"_answer"].name.split('.').pop()}`;
+                    } else {
+                        itemData.answer = menuData.firstMenu[uidx].secondMenu[idx]?.answer || "";
+                    }
 
                     arr.push(itemData);
                 });
