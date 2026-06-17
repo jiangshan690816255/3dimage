@@ -350,6 +350,25 @@
     const answerModal = document.getElementById('answerModal');
     const answerImg = document.getElementById('answerImg');
 
+    // 判断是否为 COS URL
+    function isCOSUrl(url) {
+      try {
+        const u = new URL(url);
+        return u.hostname.includes('.cos.') && u.hostname.includes('.myqcloud.com');
+      } catch { return false; }
+    }
+
+    // 从 COS URL 获取本地预览 blob URL
+    function getKeyFromUrl(url) {
+      return new URL(url).pathname.substring(1);
+    }
+    async function previewFromCOS(cosUrl) {
+      const cosKey = getKeyFromUrl(cosUrl);
+      const previewRes = await fetch('/preview?key=' + encodeURIComponent(cosKey));
+      const blob = await previewRes.blob();
+      return URL.createObjectURL(blob);
+    }
+
     // 折叠/展开菜单
     collapseBtn.onclick = () => {
       firstMenu.classList.toggle('collapsed');
@@ -367,15 +386,21 @@
       if (e.target === videoModal) closeVideo();
     }
 
-    function playVideo(title) {
-      const videoUrl = `models/${title}.mp4`;
-      videoPlayer.src = videoUrl;
-      videoModal.classList.add('show');
+    function playVideo(videoUrl) {
+      if (videoUrl) {
+        videoPlayer.src = videoUrl;
+        videoModal.classList.add('show');
+      }
     }
 
-    // 打开答案图片
-    function openAnswer(imgUrl) {
-      answerImg.src = imgUrl;
+    // 打开答案图片（COS 图片通过预览方法获取）
+    async function openAnswer(imgUrl) {
+      if (!imgUrl) return;
+      if (isCOSUrl(imgUrl)) {
+        answerImg.src = await previewFromCOS(imgUrl);
+      } else {
+        answerImg.src = imgUrl;
+      }
       answerModal.classList.add('show');
     }
     function closeAnswer() {
@@ -386,7 +411,7 @@
     }
 
     async function loadMenu() {
-      const res = await fetch('./menu.json?_=' + Date.now());
+      const res = await fetch('/get-menu?_=' + Date.now());
       const data = await res.json();
       renderFirstMenu(data.firstMenu);
     }
@@ -426,15 +451,40 @@
 
         a.innerHTML = `
           <div class="second-item">
-            <img src="${item.image}" alt="${item.title}">
+            <img src="" alt="${item.title}">
             <span>${item.title}</span>
-            
-            <!-- 查看答案按钮 -->
-            <div class="answer-btn" onclick="event.stopPropagation();event.preventDefault();openAnswer('${item.answer}')">答</div>
-            
-            <div class="play-icon" onclick="event.stopPropagation();event.preventDefault();playVideo('${item.title}')">▶</div>
+            <div class="answer-btn">答</div>
+            <div class="play-icon">▶</div>
           </div>
         `;
+
+        const img = a.querySelector('img');
+        const answerBtn = a.querySelector('.answer-btn');
+        const playBtn = a.querySelector('.play-icon');
+
+        // 教学图：COS 图片通过预览方法获取 blob URL
+        if (item.image) {
+          if (isCOSUrl(item.image)) {
+            previewFromCOS(item.image).then(blobUrl => { img.src = blobUrl; });
+          } else {
+            img.src = item.image;
+          }
+        }
+
+        // 答案按钮
+        answerBtn.onclick = (e) => {
+          e.stopPropagation();
+          e.preventDefault();
+          openAnswer(item.answer);
+        };
+
+        // 视频按钮
+        playBtn.onclick = (e) => {
+          e.stopPropagation();
+          e.preventDefault();
+          playVideo(item.video);
+        };
+
         grid.appendChild(a);
       });
     }

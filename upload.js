@@ -103,4 +103,50 @@ router.get('/preview', async (req, res) => {
   }
 });
 
+// POST /save-menu - 保存 menu.json 到 COS
+router.post('/save-menu', async (req, res) => {
+  try {
+    const jsonStr = JSON.stringify(req.body, null, 2);
+    const buffer = Buffer.from(jsonStr, 'utf-8');
+    const result = await uploadToCOS(buffer, 'menu.json', 'application/json');
+    res.json({ success: true, url: result.url });
+  } catch (err) {
+    console.error('保存 menu.json 失败:', err.code || err.message, err);
+    res.status(500).json({ success: false, message: err.message, code: err.code });
+  }
+});
+
+// GET /get-menu - 从 COS 读取 menu.json 并转换为完整 URL
+router.get('/get-menu', async (req, res) => {
+  try {
+    if (!BUCKET || !REGION || !process.env.COS_SECRET_ID || !process.env.COS_SECRET_KEY) {
+      return res.status(500).json({ success: false, message: 'COS 配置不完整，请检查 .env 文件' });
+    }
+    const data = await getFileFromCOS('menu.json');
+    const menu = JSON.parse(data.Body.toString('utf-8'));
+    const cosBase = `https://${BUCKET}.cos.${REGION}.myqcloud.com/`;
+
+    // 将相对 COS 路径转换为完整 URL
+    function convertPath(val) {
+      if (!val) return val;
+      if (val.startsWith('http://') || val.startsWith('https://')) return val;
+      return cosBase + val;
+    }
+
+    menu.firstMenu.forEach(unit => {
+      unit.secondMenu.forEach(item => {
+        item.image = convertPath(item.image);
+        item.model = convertPath(item.model);
+        item.video = convertPath(item.video);
+        item.answer = convertPath(item.answer);
+      });
+    });
+
+    res.json(menu);
+  } catch (err) {
+    console.error('读取 menu.json 失败:', err.code || err.message, err);
+    res.status(500).json({ success: false, message: err.message, code: err.code });
+  }
+});
+
 module.exports = router;

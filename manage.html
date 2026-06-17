@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <title>菜单管理（上传FBX到GitHub + 自动部署Netlify）</title>
+    <title>菜单管理（上传到腾讯云 COS）</title>
     <style>
         *{box-sizing:border-box;margin:0;padding:0;font-family:微软雅黑}
         body{padding:20px;background:#f5f5f5}
@@ -193,11 +193,11 @@
     </style>
 </head>
 <body>
-    <h1>菜单管理（上传FBX到GitHub + 自动部署Netlify）</h1>
+    <h1>菜单管理（上传到腾讯云 COS）</h1>
     <div class="box">
         <button id="addUnitBtn">新增一级菜单</button>
         <button id="copyBtn">复制JSON</button>
-        <button id="save">保存并上传到Git</button>
+        <button id="save">保存并上传到腾讯云</button>
         <div id="tip"></div>
     </div>
     <div id="editor"></div>
@@ -208,25 +208,6 @@
     </div>
 
     <script>
-        // ====================== 固定配置（无Token）======================
-        const CONFIG = {
-            OWNER: "jiangshan690816255",
-            REPO: "3dimage",
-            BRANCH: "main"
-        };
-        // ===============================================================
-
-        let GITHUB_TOKEN = localStorage.getItem("GITHUB_TOKEN");
-        if (!GITHUB_TOKEN || GITHUB_TOKEN === "null" || GITHUB_TOKEN === "undefined") {
-            GITHUB_TOKEN = prompt("请输入你的 GitHub Token：", "");
-            if (GITHUB_TOKEN) {
-                localStorage.setItem("GITHUB_TOKEN", GITHUB_TOKEN);
-                alert("✅ Token 已保存，下次无需重新输入");
-            } else {
-                alert("❌ 未输入Token，无法上传到Git");
-            }
-        }
-
         let menuData;
         const imgModal = document.getElementById('imgModal');
         const modalImg = document.getElementById('modalImg');
@@ -256,10 +237,22 @@
             return null;
         }
 
-        // 通过 COS URL 获取本地预览 blob URL
+        // 从 COS URL 提取文件路径（去掉域名）
+        function getKeyFromUrl(url) {
+            return new URL(url).pathname.substring(1);
+        }
+
+        // 判断是否为 COS URL
+        function isCOSUrl(url) {
+            try {
+                const u = new URL(url);
+                return u.hostname.includes('.cos.') && u.hostname.includes('.myqcloud.com');
+            } catch { return false; }
+        }
+
+        // 通过 COS URL 获取本地预览 blob URL（仅用于 COS 图片）
         async function previewFromCOS(cosUrl) {
-            const urlObj = new URL(cosUrl);
-            const cosKey = urlObj.pathname.substring(1);
+            const cosKey = getKeyFromUrl(cosUrl);
             const previewRes = await fetch('/preview?key=' + encodeURIComponent(cosKey));
             const blob = await previewRes.blob();
             return URL.createObjectURL(blob);
@@ -275,7 +268,7 @@
             }
         };
 
-        fetch('./menu.json?_=' + Date.now())
+        fetch('/get-menu?_=' + Date.now())
             .then(res => res.json())
             .then(data => {
                 menuData = data;
@@ -416,6 +409,14 @@
                         fbxWrap.classList.add('show');
                         await uploadFileToCOS(f, 'model', key);
                     };
+
+                    // 初始加载时，教学图和答案通过预览方法获取 blob URL
+                    if (item.image && isCOSUrl(item.image)) {
+                        previewFromCOS(item.image).then(blobUrl => { prev.src = blobUrl; });
+                    }
+                    if (item.answer && isCOSUrl(item.answer)) {
+                        previewFromCOS(item.answer).then(blobUrl => { answerPrev.src = blobUrl; });
+                    }
                 });
             });
         }
@@ -492,41 +493,19 @@
                 u.querySelectorAll('.item').forEach((it, idx) => {
                     const t = it.querySelector('.title').value.trim();
                     const key = `${uidx}-${idx}`;
-                    const hasFBX = !!fileBuffer[key];
-                    const hasVideo = !!fileBuffer[key + "_video"];
-                    const hasAnswer = !!fileBuffer[key + "_answer"];
+                    const oldData = menuData.firstMenu[uidx].secondMenu[idx] || {};
 
                     const itemData = {
                         title: t,
-                        image: (cosUrls[key] && cosUrls[key].image) || it.querySelector('.prev').src,
-                        model: "",
-                        video: "",
-                        answer: ""
+                        image: (cosUrls[key] && cosUrls[key].image)
+                            ? getKeyFromUrl(cosUrls[key].image) : (oldData.image || ""),
+                        model: (cosUrls[key] && cosUrls[key].model)
+                            ? getKeyFromUrl(cosUrls[key].model) : (oldData.model || ""),
+                        video: (cosUrls[key] && cosUrls[key].video)
+                            ? getKeyFromUrl(cosUrls[key].video) : (oldData.video || ""),
+                        answer: (cosUrls[key] && cosUrls[key].answer)
+                            ? getKeyFromUrl(cosUrls[key].answer) : (oldData.answer || "")
                     };
-
-                    if (cosUrls[key] && cosUrls[key].model) {
-                        itemData.model = cosUrls[key].model;
-                    } else if (hasFBX) {
-                        itemData.model = `models/${t}.fbx`;
-                    } else {
-                        itemData.model = menuData.firstMenu[uidx].secondMenu[idx]?.model || "";
-                    }
-
-                    if (cosUrls[key] && cosUrls[key].video) {
-                        itemData.video = cosUrls[key].video;
-                    } else if (hasVideo) {
-                        itemData.video = `models/${t}.mp4`;
-                    } else {
-                        itemData.video = menuData.firstMenu[uidx].secondMenu[idx]?.video || "";
-                    }
-
-                    if (cosUrls[key] && cosUrls[key].answer) {
-                        itemData.answer = cosUrls[key].answer;
-                    } else if (hasAnswer) {
-                        itemData.answer = `models/${t}_answer.${fileBuffer[key+"_answer"].name.split('.').pop()}`;
-                    } else {
-                        itemData.answer = menuData.firstMenu[uidx].secondMenu[idx]?.answer || "";
-                    }
 
                     arr.push(itemData);
                 });
@@ -540,85 +519,26 @@
             document.getElementById('tip').innerText = "✅ 已复制JSON";
         };
 
-        async function uploadToGitHub(path, content, isBase64) {
-            const url = `https://api.github.com/repos/${CONFIG.OWNER}/${CONFIG.REPO}/contents/${path}`;
-            let sha = undefined;
-
-            try {
-                const getRes = await fetch(url, {
-                    headers: { Authorization: `token ${GITHUB_TOKEN}` }
-                });
-                if (getRes.ok) {
-                    const data = await getRes.json();
-                    sha = data.sha;
-                }
-            } catch (e) {}
-
-            const body = {
-                message: `Upload ${path}`,
-                branch: CONFIG.BRANCH,
-                content: content
-            };
-            if (sha) body.sha = sha;
-
-            return await fetch(url, {
-                method: 'PUT',
-                headers: {
-                    Authorization: `token ${GITHUB_TOKEN}`,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(body)
-            });
-        }
-
         document.getElementById('save').onclick = async function () {
             const tip = document.getElementById('tip');
-            tip.innerText = "⏳ 正在上传文件到GitHub...";
+            tip.innerText = "⏳ 正在上传 menu.json 到腾讯云...";
 
-            for (let uidx = 0; uidx < menuData.firstMenu.length; uidx++) {
-                const unit = menuData.firstMenu[uidx];
-                for (let idx = 0; idx < unit.secondMenu.length; idx++) {
-                    const key = `${uidx}-${idx}`;
-                    const title = unit.secondMenu[idx].title;
-                    if(!title) continue;
-
-                    const fbxFile = fileBuffer[key];
-                    if(fbxFile){
-                        const base64 = await new Promise((resolve) => {
-                            const reader = new FileReader();
-                            reader.onload = e => resolve(e.target.result.split(',')[1]);
-                            reader.readAsDataURL(fbxFile);
-                        });
-                        await uploadToGitHub(`models/${title}.fbx`, base64, true);
-                    }
-
-                    const videoFile = fileBuffer[key + "_video"];
-                    if(videoFile){
-                        const base64 = await new Promise((resolve) => {
-                            const reader = new FileReader();
-                            reader.onload = e => resolve(e.target.result.split(',')[1]);
-                            reader.readAsDataURL(videoFile);
-                        });
-                        await uploadToGitHub(`models/${title}.mp4`, base64, true);
-                    }
-
-                    const answerFile = fileBuffer[key + "_answer"];
-                    if(answerFile){
-                        const ext = answerFile.name.split('.').pop();
-                        const fileName = `${title}_answer.${ext}`;
-                        const base64 = await new Promise((resolve) => {
-                            const reader = new FileReader();
-                            reader.onload = e => resolve(e.target.result.split(',')[1]);
-                            reader.readAsDataURL(answerFile);
-                        });
-                        await uploadToGitHub(`models/${fileName}`, base64, true);
-                    }
+            const jsonContent = getJson();
+            try {
+                const res = await fetch('/save-menu', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: jsonContent
+                });
+                const data = await res.json();
+                if (data.success) {
+                    tip.innerText = "✅ 上传完成！";
+                } else {
+                    tip.innerText = "❌ 上传失败：" + data.message;
                 }
+            } catch (e) {
+                tip.innerText = "❌ 上传失败：" + e.message;
             }
-
-            const jsonContent = btoa(unescape(encodeURIComponent(getJson())));
-            await uploadToGitHub('menu.json', jsonContent);
-            tip.innerText = "✅ 上传完成！GitHub Pages 已自动更新";
         };
     </script>
 </body>

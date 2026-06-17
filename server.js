@@ -6,6 +6,9 @@ const path = require('path');
 const app = express();
 const PORT = process.env.PORT || 1024;
 
+// 解析 JSON body
+app.use(express.json());
+
 // 托管静态文件
 app.use(express.static(__dirname));
 
