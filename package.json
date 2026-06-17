@@ -2,14 +2,9 @@
   "name": "3dimage",
   "version": "1.0.0",
   "description": "3D建模图片预览",
-  "main": "server.js",
-  "scripts": {
-    "start": "node server.js",
-    "dev": "node server.js"
-  },
+  "scripts": {},
   "dependencies": {
     "cos-nodejs-sdk-v5": "^2.15.4",
-    "dotenv": "^16.6.1",
     "express": "^4.21.0",
     "multer": "^1.4.5-lts.1"
   }

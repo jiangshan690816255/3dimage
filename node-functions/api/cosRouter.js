@@ -2,7 +2,7 @@ const express = require('express');
 const multer = require('multer');
 const COS = require('cos-nodejs-sdk-v5');
 
-// 腾讯云 COS 配置（建议通过环境变量设置）
+// 腾讯云 COS 配置（环境变量在EdgeOne项目设置里配置）
 const cos = new COS({
   SecretId: process.env.COS_SECRET_ID || '',
   SecretKey: process.env.COS_SECRET_KEY || '',
@@ -42,7 +42,7 @@ function uploadToCOS(fileBuffer, key, contentType) {
 
 // 启动时检查 COS 配置
 if (!BUCKET || !REGION || !process.env.COS_SECRET_ID || !process.env.COS_SECRET_KEY) {
-  console.warn('⚠️  COS 配置不完整，请检查 .env 文件中的 COS_SECRET_ID / COS_SECRET_KEY / COS_BUCKET / COS_REGION');
+  console.warn('⚠️  COS 配置不完整，请检查环境变量');
 }
 
 // POST /upload - 上传文件
@@ -52,7 +52,7 @@ router.post('/upload', upload.single('file'), async (req, res) => {
       return res.status(400).json({ success: false, message: '未收到文件' });
     }
     if (!BUCKET || !REGION || !process.env.COS_SECRET_ID || !process.env.COS_SECRET_KEY) {
-      return res.status(500).json({ success: false, message: 'COS 配置不完整，请检查 .env 文件' });
+      return res.status(500).json({ success: false, message: 'COS 配置不完整' });
     }
     const ext = req.file.originalname.split('.').pop();
     const key = req.body.key || `uploads/${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${ext}`;
@@ -64,10 +64,24 @@ router.post('/upload', upload.single('file'), async (req, res) => {
   }
 });
 
+// GET /preview?key=xxx - 文件预览
+router.get('/preview', async (req, res) => {
+  try {
+    const key = req.query.key;
+    if (!key) {
+      return res.status(400).json({ success: false, message: '缺少 key 参数' });
+    }
+    const data = await getFileFromCOS(key);
+    const contentType = data.headers && data.headers['content-type'];
+    if (contentType) res.set('Content-Type', contentType);
+    res.send(data.Body);
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message, code: err.code });
+  }
+});
+
 /**
  * 从 COS 获取文件（预览）
- * @param {string} key - COS 对象键
- * @returns {Promise<{Body: Buffer, headers: object}>}
  */
 function getFileFromCOS(key) {
   return new Promise((resolve, reject) => {
@@ -82,28 +96,7 @@ function getFileFromCOS(key) {
   });
 }
 
-// GET /preview?key=xxx - 文件预览
-router.get('/preview', async (req, res) => {
-  try {
-    const key = req.query.key;
-    if (!key) {
-      return res.status(400).json({ success: false, message: '缺少 key 参数' });
-    }
-    if (!BUCKET || !REGION || !process.env.COS_SECRET_ID || !process.env.COS_SECRET_KEY) {
-      return res.status(500).json({ success: false, message: 'COS 配置不完整，请检查 .env 文件' });
-    }
-    console.log('🔍 预览请求 key:', key, 'Bucket:', BUCKET, 'Region:', REGION);
-    const data = await getFileFromCOS(key);
-    const contentType = data.headers && data.headers['content-type'];
-    if (contentType) res.set('Content-Type', contentType);
-    res.send(data.Body);
-  } catch (err) {
-    console.error('COS 预览失败:', err.code || err.message, err);
-    res.status(500).json({ success: false, message: err.message, code: err.code });
-  }
-});
-
-// POST /save-menu - 保存 menu.json 到 COS
+// POST /save-menu - 保存 menu.json
 router.post('/save-menu', async (req, res) => {
   try {
     const jsonStr = JSON.stringify(req.body, null, 2);
@@ -111,22 +104,17 @@ router.post('/save-menu', async (req, res) => {
     const result = await uploadToCOS(buffer, 'menu.json', 'application/json');
     res.json({ success: true, url: result.url });
   } catch (err) {
-    console.error('保存 menu.json 失败:', err.code || err.message, err);
     res.status(500).json({ success: false, message: err.message, code: err.code });
   }
 });
 
-// GET /get-menu - 从 COS 读取 menu.json 并转换为完整 URL
+// GET /get-menu - 读取菜单并补全链接
 router.get('/get-menu', async (req, res) => {
   try {
-    if (!BUCKET || !REGION || !process.env.COS_SECRET_ID || !process.env.COS_SECRET_KEY) {
-      return res.status(500).json({ success: false, message: 'COS 配置不完整，请检查 .env 文件' });
-    }
     const data = await getFileFromCOS('menu.json');
     const menu = JSON.parse(data.Body.toString('utf-8'));
     const cosBase = `https://${BUCKET}.cos.${REGION}.myqcloud.com/`;
 
-    // 将相对 COS 路径转换为完整 URL
     function convertPath(val) {
       if (!val) return val;
       if (val.startsWith('http://') || val.startsWith('https://')) return val;
@@ -141,12 +129,21 @@ router.get('/get-menu', async (req, res) => {
         item.answer = convertPath(item.answer);
       });
     });
-
     res.json(menu);
   } catch (err) {
-    console.error('读取 menu.json 失败:', err.code || err.message, err);
     res.status(500).json({ success: false, message: err.message, code: err.code });
   }
 });
 
-module.exports = router;
+// ====================== 关键新增：适配EdgeOne Node Functions导出handler ======================
+const app = express();
+// 必须开启解析表单、json
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+app.use('/', router);
+
+// 平台入口，不要写 app.listen()
+exports.handler = async (ctx) => {
+  const { req, res } = ctx;
+  await app(req, res);
+};
