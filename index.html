@@ -364,7 +364,7 @@
     }
     async function previewFromCOS(cosUrl) {
       const cosKey = getKeyFromUrl(cosUrl);
-      const previewRes = await fetch('/preview?key=' + encodeURIComponent(cosKey));
+      const previewRes = await fetch('/api/preview?key=' + encodeURIComponent(cosKey));
       const blob = await previewRes.blob();
       return URL.createObjectURL(blob);
     }
@@ -411,7 +411,7 @@
     }
 
     async function loadMenu() {
-      const res = await fetch('/get-menu?_=' + Date.now());
+      const res = await fetch('/api/get-menu?_=' + Date.now());
       const data = await res.json();
       renderFirstMenu(data.firstMenu);
     }

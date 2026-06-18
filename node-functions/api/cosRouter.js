@@ -45,8 +45,8 @@ if (!BUCKET || !REGION || !process.env.COS_SECRET_ID || !process.env.COS_SECRET_
   console.warn('⚠️  COS 配置不完整，请检查环境变量');
 }
 
-// POST /upload - 上传文件
-router.post('/upload', upload.single('file'), async (req, res) => {
+// POST /api/upload - 上传文件
+router.post('/api/upload', upload.single('file'), async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ success: false, message: '未收到文件' });
@@ -64,8 +64,8 @@ router.post('/upload', upload.single('file'), async (req, res) => {
   }
 });
 
-// GET /preview?key=xxx - 文件预览
-router.get('/preview', async (req, res) => {
+// GET /api/preview?key=xxx - 文件预览
+router.get('/api/preview', async (req, res) => {
   try {
     const key = req.query.key;
     if (!key) {
@@ -96,8 +96,8 @@ function getFileFromCOS(key) {
   });
 }
 
-// POST /save-menu - 保存 menu.json
-router.post('/save-menu', async (req, res) => {
+// POST /api/save-menu - 保存 menu.json
+router.post('/api/save-menu', async (req, res) => {
   try {
     const jsonStr = JSON.stringify(req.body, null, 2);
     const buffer = Buffer.from(jsonStr, 'utf-8');
@@ -108,8 +108,8 @@ router.post('/save-menu', async (req, res) => {
   }
 });
 
-// GET /get-menu - 读取菜单并补全链接
-router.get('/get-menu', async (req, res) => {
+// GET /api/get-menu - 读取菜单并补全链接
+router.get('/api/get-menu', async (req, res) => {
   try {
     const data = await getFileFromCOS('menu.json');
     const menu = JSON.parse(data.Body.toString('utf-8'));
@@ -135,14 +135,17 @@ router.get('/get-menu', async (req, res) => {
   }
 });
 
-// ====================== 关键新增：适配EdgeOne Node Functions导出handler ======================
+// ====================== 导出供 server.js 和 EdgeOne Node Functions 使用 ======================
+
+// 本地开发使用：server.js 通过 require 获取 router
+exports.router = router;
+
+// EdgeOne Node Functions 入口：平台调用 handler(ctx)
 const app = express();
-// 必须开启解析表单、json
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use('/', router);
 
-// 平台入口，不要写 app.listen()
 exports.handler = async (ctx) => {
   const { req, res } = ctx;
   await app(req, res);

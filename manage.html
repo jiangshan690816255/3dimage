@@ -223,7 +223,7 @@
             fd.append('file', file);
             fd.append('key', 'uploads/' + safeName);
             try {
-                const res = await fetch('/upload', { method: 'POST', body: fd });
+                const res = await fetch('/api/upload', { method: 'POST', body: fd });
                 const data = await res.json();
                 if (data.success) {
                     if (!cosUrls[itemKey]) cosUrls[itemKey] = {};
@@ -253,7 +253,7 @@
         // 通过 COS URL 获取本地预览 blob URL（仅用于 COS 图片）
         async function previewFromCOS(cosUrl) {
             const cosKey = getKeyFromUrl(cosUrl);
-            const previewRes = await fetch('/preview?key=' + encodeURIComponent(cosKey));
+            const previewRes = await fetch('/api/preview?key=' + encodeURIComponent(cosKey));
             const blob = await previewRes.blob();
             return URL.createObjectURL(blob);
         }
@@ -268,7 +268,7 @@
             }
         };
 
-        fetch('/get-menu?_=' + Date.now())
+        fetch('/api/get-menu?_=' + Date.now())
             .then(res => res.json())
             .then(data => {
                 menuData = data;
@@ -525,7 +525,7 @@
 
             const jsonContent = getJson();
             try {
-                const res = await fetch('/save-menu', {
+                const res = await fetch('/api/save-menu', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: jsonContent
