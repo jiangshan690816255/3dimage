@@ -2,7 +2,7 @@ require('dotenv').config();
 
 const express = require('express');
 const path = require('path');
-const { router: apiRouter } = require('./node-functions/api/cosRouter');
+const { router: apiRouter } = require('./node-functions/api/index');
 
 const app = express();
 const PORT = process.env.PORT || 1024;
