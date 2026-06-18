@@ -478,13 +478,31 @@
             render();
         };
 
-        window.delUnit = function (uidx, e) {
+        window.delUnit = async function (uidx, e) {
             e.stopPropagation();
             if (menuData.firstMenu.length <= 1) {
                 alert('至少保留一个');
                 return;
             }
-            if (!confirm('确定删除？')) return;
+            if (!confirm('确定删除？此操作将同时删除单元下所有云端文件')) return;
+            // 删除该单元下所有例题的 COS 文件
+            const unit = menuData.firstMenu[uidx];
+            const deletions = [];
+            unit.secondMenu.forEach((item, idx) => {
+                const key = `${uidx}-${idx}`;
+                if (cosUrls[key]) {
+                    deletions.push(deleteFileFromCOS(cosUrls[key].image));
+                    deletions.push(deleteFileFromCOS(cosUrls[key].answer));
+                    deletions.push(deleteFileFromCOS(cosUrls[key].video));
+                    deletions.push(deleteFileFromCOS(cosUrls[key].model));
+                }
+                delete cosUrls[key];
+                delete fileBuffer[key];
+                delete fileBuffer[key + '_video'];
+                delete fileBuffer[key + '_answer'];
+                delete answerPreview[key];
+            });
+            await Promise.all(deletions);
             menuData.firstMenu.splice(uidx, 1);
             render();
         };
@@ -504,13 +522,23 @@
             icon.textContent = '▼';
         };
 
-        window.delItem = function (uidx, idx, btnEl) {
-            if (!confirm('确定删除？')) return;
+        window.delItem = async function (uidx, idx, btnEl) {
+            if (!confirm('确定删除？此操作将同时删除该例题的云端文件')) return;
             const key = `${uidx}-${idx}`;
+            // 删除 COS 上的关联文件
+            const deletions = [];
+            if (cosUrls[key]) {
+                deletions.push(deleteFileFromCOS(cosUrls[key].image));
+                deletions.push(deleteFileFromCOS(cosUrls[key].answer));
+                deletions.push(deleteFileFromCOS(cosUrls[key].video));
+                deletions.push(deleteFileFromCOS(cosUrls[key].model));
+            }
+            delete cosUrls[key];
             delete fileBuffer[key];
             delete fileBuffer[key + "_video"];
             delete fileBuffer[key + "_answer"];
             delete answerPreview[key];
+            await Promise.all(deletions);
             menuData.firstMenu[uidx].secondMenu.splice(idx, 1);
             const itemEl = btnEl.closest('.item');
             if (itemEl) itemEl.remove();
