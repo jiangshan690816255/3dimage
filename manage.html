@@ -237,6 +237,28 @@
             return null;
         }
 
+        // 删除 COS 上的旧文件（先删后传）
+        async function deleteFileFromCOS(cosUrl) {
+            if (!cosUrl || !isCOSUrl(cosUrl)) return;
+            const key = getKeyFromUrl(cosUrl);
+            console.log(`🗑 删除旧文件: ${key}`);
+            try {
+                const res = await fetch('/api/delete', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ key })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    console.log(`✅ 旧文件已删除: ${key}`);
+                } else {
+                    console.warn(`⚠ 删除旧文件失败: ${data.message}`);
+                }
+            } catch (e) {
+                console.warn('删除请求异常:', e);
+            }
+        }
+
         // 从 COS URL 提取文件路径（去掉域名）
         function getKeyFromUrl(url) {
             return new URL(url).pathname.substring(1);
@@ -377,6 +399,8 @@
                     imgFile.onchange = async function () {
                         const f = imgFile.files[0];
                         if (!f) return;
+                        // 先删除 COS 上的旧图片
+                        await deleteFileFromCOS(cosUrls[key] && cosUrls[key].image);
                         const result = await uploadFileToCOS(f, 'image', key);
                         if (result && result.url) {
                             prev.src = await previewFromCOS(result.url);
@@ -386,6 +410,8 @@
                     answerFile.onchange = async function () {
                         const f = answerFile.files[0];
                         if (!f) return;
+                        // 先删除 COS 上的旧答案图
+                        await deleteFileFromCOS(cosUrls[key] && cosUrls[key].answer);
                         fileBuffer[key + "_answer"] = f;
                         answerTag.classList.add('show');
                         const result = await uploadFileToCOS(f, 'answer', key);
@@ -397,6 +423,8 @@
                     videoFile.onchange = async function () {
                         const f = videoFile.files[0];
                         if (!f) return;
+                        // 先删除 COS 上的旧视频
+                        await deleteFileFromCOS(cosUrls[key] && cosUrls[key].video);
                         fileBuffer[key + "_video"] = f;
                         videoWrap.classList.add('show');
                         await uploadFileToCOS(f, 'video', key);
@@ -405,6 +433,8 @@
                     modelFile.onchange = async function () {
                         const f = modelFile.files[0];
                         if (!f) return;
+                        // 先删除 COS 上的旧模型
+                        await deleteFileFromCOS(cosUrls[key] && cosUrls[key].model);
                         fileBuffer[key] = f;
                         fbxWrap.classList.add('show');
                         await uploadFileToCOS(f, 'model', key);
