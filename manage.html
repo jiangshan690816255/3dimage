@@ -190,6 +190,21 @@
         .img-modal.show{display:flex;}
         .modal-img{max-width:90%;max-height:90%;object-fit:contain;}
         .close-modal{position:absolute;top:20px;right:30px;color:#fff;font-size:30px;cursor:pointer;}
+        .upload-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.5); display: none; align-items: center; justify-content: center; z-index: 1000;
+            flex-direction: column; gap: 12px;
+        }
+        .upload-overlay.show { display: flex; }
+        .upload-spinner {
+            width: 48px; height: 48px;
+            border: 4px solid rgba(255,255,255,0.3);
+            border-top-color: #fff;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .upload-text { color: #fff; font-size: 16px; }
     </style>
 </head>
 <body>
@@ -207,6 +222,11 @@
         <img class="modal-img" id="modalImg" src="">
     </div>
 
+    <div class="upload-overlay" id="uploadOverlay">
+        <div class="upload-spinner"></div>
+        <div class="upload-text" id="uploadText">正在上传到腾讯云...</div>
+    </div>
+
     <script>
         let menuData;
         const imgModal = document.getElementById('imgModal');
@@ -214,6 +234,30 @@
         let fileBuffer = {};
         let answerPreview = {};
         let cosUrls = {}; // 存储 COS 上传后的 URL，key -> { image?, model?, video?, answer? }
+        let uploading = false;
+
+        // 锁定/解锁界面，显示上传 loading
+        function setUploading(state, text) {
+            uploading = state;
+            const overlay = document.getElementById('uploadOverlay');
+            const uploadText = document.getElementById('uploadText');
+            if (state) {
+                overlay.classList.add('show');
+                uploadText.textContent = text || '正在上传到腾讯云...';
+            } else {
+                overlay.classList.remove('show');
+            }
+            // 禁用所有按钮和输入框
+            document.querySelectorAll('button, input, textarea').forEach(el => {
+                if (state) {
+                    el.setAttribute('data-upload-disabled', el.disabled ? '1' : '0');
+                    el.disabled = true;
+                } else {
+                    if (el.getAttribute('data-upload-disabled') === '0') el.disabled = false;
+                    el.removeAttribute('data-upload-disabled');
+                }
+            });
+        }
 
         // 上传文件到 COS
         async function uploadFileToCOS(file, category, itemKey) {
@@ -410,45 +454,82 @@
                     imgFile.onchange = async function () {
                         const f = imgFile.files[0];
                         if (!f) return;
-                        // 先删除 COS 上的旧图片
-                        await deleteFileFromCOS(cosUrls[key] && cosUrls[key].image);
-                        const result = await uploadFileToCOS(f, 'image', key);
-                        if (result && result.url) {
-                            prev.src = await previewFromCOS(result.url);
+                        setUploading(true, '正在上传图片...');
+                        try {
+                            await deleteFileFromCOS(cosUrls[key] && cosUrls[key].image);
+                            const result = await uploadFileToCOS(f, 'image', key);
+                            if (result && result.success && result.url) {
+                                prev.src = await previewFromCOS(result.url);
+                                console.log('✅ 图片上传完成，预览已更新');
+                            } else {
+                                alert('图片上传失败，请重试');
+                                imgFile.value = '';
+                            }
+                        } finally {
+                            setUploading(false);
                         }
                     };
 
                     answerFile.onchange = async function () {
                         const f = answerFile.files[0];
                         if (!f) return;
-                        // 先删除 COS 上的旧答案图
-                        await deleteFileFromCOS(cosUrls[key] && cosUrls[key].answer);
-                        fileBuffer[key + "_answer"] = f;
-                        answerTag.classList.add('show');
-                        const result = await uploadFileToCOS(f, 'answer', key);
-                        if (result && result.url) {
-                            answerPrev.src = await previewFromCOS(result.url);
+                        setUploading(true, '正在上传答案图...');
+                        try {
+                            await deleteFileFromCOS(cosUrls[key] && cosUrls[key].answer);
+                            fileBuffer[key + "_answer"] = f;
+                            const result = await uploadFileToCOS(f, 'answer', key);
+                            if (result && result.success && result.url) {
+                                answerPrev.src = await previewFromCOS(result.url);
+                                answerTag.classList.add('show');
+                                console.log('✅ 答案图上传完成');
+                            } else {
+                                alert('答案图上传失败，请重试');
+                                answerFile.value = '';
+                                fileBuffer[key + "_answer"] = undefined;
+                            }
+                        } finally {
+                            setUploading(false);
                         }
                     };
 
                     videoFile.onchange = async function () {
                         const f = videoFile.files[0];
                         if (!f) return;
-                        // 先删除 COS 上的旧视频
-                        await deleteFileFromCOS(cosUrls[key] && cosUrls[key].video);
-                        fileBuffer[key + "_video"] = f;
-                        videoWrap.classList.add('show');
-                        await uploadFileToCOS(f, 'video', key);
+                        setUploading(true, '正在上传视频...');
+                        try {
+                            await deleteFileFromCOS(cosUrls[key] && cosUrls[key].video);
+                            const result = await uploadFileToCOS(f, 'video', key);
+                            if (result && result.success && result.url) {
+                                fileBuffer[key + "_video"] = f;
+                                videoWrap.classList.add('show');
+                                console.log('✅ 视频上传完成');
+                            } else {
+                                alert('视频上传失败，请重试');
+                                videoFile.value = '';
+                            }
+                        } finally {
+                            setUploading(false);
+                        }
                     };
 
                     modelFile.onchange = async function () {
                         const f = modelFile.files[0];
                         if (!f) return;
-                        // 先删除 COS 上的旧模型
-                        await deleteFileFromCOS(cosUrls[key] && cosUrls[key].model);
-                        fileBuffer[key] = f;
-                        fbxWrap.classList.add('show');
-                        await uploadFileToCOS(f, 'model', key);
+                        setUploading(true, '正在上传3D模型...');
+                        try {
+                            await deleteFileFromCOS(cosUrls[key] && cosUrls[key].model);
+                            const result = await uploadFileToCOS(f, 'model', key);
+                            if (result && result.success && result.url) {
+                                fileBuffer[key] = f;
+                                fbxWrap.classList.add('show');
+                                console.log('✅ 模型上传完成');
+                            } else {
+                                alert('模型上传失败，请重试');
+                                modelFile.value = '';
+                            }
+                        } finally {
+                            setUploading(false);
+                        }
                     };
 
                     // 初始加载时，教学图和答案通过预览方法获取 blob URL
@@ -496,30 +577,34 @@
                 return;
             }
             if (!confirm('确定删除？此操作将同时删除单元下所有云端文件')) return;
-            // 删除该单元下所有例题的 COS 文件
-            const unit = menuData.firstMenu[uidx];
-            const deletions = [];
-            unit.secondMenu.forEach((item, idx) => {
-                const key = `${uidx}-${idx}`;
-                const itemData = item || {};
-                const urls = {
-                    image: (cosUrls[key] && cosUrls[key].image) || (isCOSUrl(itemData.image) ? itemData.image : null),
-                    answer: (cosUrls[key] && cosUrls[key].answer) || (isCOSUrl(itemData.answer) ? itemData.answer : null),
-                    video: (cosUrls[key] && cosUrls[key].video) || (isCOSUrl(itemData.video) ? itemData.video : null),
-                    model: (cosUrls[key] && cosUrls[key].model) || (isCOSUrl(itemData.model) ? itemData.model : null),
-                };
-                for (const cat of ['image', 'answer', 'video', 'model']) {
-                    if (urls[cat]) deletions.push(deleteFileFromCOS(urls[cat]));
-                }
-                delete cosUrls[key];
-                delete fileBuffer[key];
-                delete fileBuffer[key + '_video'];
-                delete fileBuffer[key + '_answer'];
-                delete answerPreview[key];
-            });
-            await Promise.all(deletions);
-            menuData.firstMenu.splice(uidx, 1);
-            render();
+            setUploading(true, '正在删除单元下所有文件...');
+            try {
+                const unit = menuData.firstMenu[uidx];
+                const deletions = [];
+                unit.secondMenu.forEach((item, idx) => {
+                    const key = `${uidx}-${idx}`;
+                    const itemData = item || {};
+                    const urls = {
+                        image: (cosUrls[key] && cosUrls[key].image) || (isCOSUrl(itemData.image) ? itemData.image : null),
+                        answer: (cosUrls[key] && cosUrls[key].answer) || (isCOSUrl(itemData.answer) ? itemData.answer : null),
+                        video: (cosUrls[key] && cosUrls[key].video) || (isCOSUrl(itemData.video) ? itemData.video : null),
+                        model: (cosUrls[key] && cosUrls[key].model) || (isCOSUrl(itemData.model) ? itemData.model : null),
+                    };
+                    for (const cat of ['image', 'answer', 'video', 'model']) {
+                        if (urls[cat]) deletions.push(deleteFileFromCOS(urls[cat]));
+                    }
+                    delete cosUrls[key];
+                    delete fileBuffer[key];
+                    delete fileBuffer[key + '_video'];
+                    delete fileBuffer[key + '_answer'];
+                    delete answerPreview[key];
+                });
+                await Promise.all(deletions);
+                menuData.firstMenu.splice(uidx, 1);
+                render();
+            } finally {
+                setUploading(false);
+            }
         };
 
         window.addItem = function (uidx) {
@@ -539,32 +624,32 @@
 
         window.delItem = async function (uidx, idx, btnEl) {
             if (!confirm('确定删除？此操作将同时删除该例题的云端文件')) return;
-            const key = `${uidx}-${idx}`;
-            const itemData = menuData.firstMenu[uidx].secondMenu[idx] || {};
-            console.log(`📋 删除例题 [${key}]，itemData:`, itemData);
-            console.log(`📋 cosUrls[${key}]:`, cosUrls[key]);
-            // 合并 cosUrls（当前会话上传的）和 menuData（已有的 COS URL）
-            const urls = {
-                image: (cosUrls[key] && cosUrls[key].image) || (isCOSUrl(itemData.image) ? itemData.image : null),
-                answer: (cosUrls[key] && cosUrls[key].answer) || (isCOSUrl(itemData.answer) ? itemData.answer : null),
-                video: (cosUrls[key] && cosUrls[key].video) || (isCOSUrl(itemData.video) ? itemData.video : null),
-                model: (cosUrls[key] && cosUrls[key].model) || (isCOSUrl(itemData.model) ? itemData.model : null),
-            };
-            console.log(`📋 待删除 URL:`, urls);
-            const deletions = [];
-            for (const cat of ['image', 'answer', 'video', 'model']) {
-                if (urls[cat]) deletions.push(deleteFileFromCOS(urls[cat]));
+            setUploading(true, '正在删除例题文件...');
+            try {
+                const key = `${uidx}-${idx}`;
+                const itemData = menuData.firstMenu[uidx].secondMenu[idx] || {};
+                const urls = {
+                    image: (cosUrls[key] && cosUrls[key].image) || (isCOSUrl(itemData.image) ? itemData.image : null),
+                    answer: (cosUrls[key] && cosUrls[key].answer) || (isCOSUrl(itemData.answer) ? itemData.answer : null),
+                    video: (cosUrls[key] && cosUrls[key].video) || (isCOSUrl(itemData.video) ? itemData.video : null),
+                    model: (cosUrls[key] && cosUrls[key].model) || (isCOSUrl(itemData.model) ? itemData.model : null),
+                };
+                const deletions = [];
+                for (const cat of ['image', 'answer', 'video', 'model']) {
+                    if (urls[cat]) deletions.push(deleteFileFromCOS(urls[cat]));
+                }
+                await Promise.all(deletions);
+                delete cosUrls[key];
+                delete fileBuffer[key];
+                delete fileBuffer[key + "_video"];
+                delete fileBuffer[key + "_answer"];
+                delete answerPreview[key];
+                menuData.firstMenu[uidx].secondMenu.splice(idx, 1);
+                const itemEl = btnEl.closest('.item');
+                if (itemEl) itemEl.remove();
+            } finally {
+                setUploading(false);
             }
-            console.log(`📋 发起 ${deletions.length} 个删除请求`);
-            await Promise.all(deletions);
-            delete cosUrls[key];
-            delete fileBuffer[key];
-            delete fileBuffer[key + "_video"];
-            delete fileBuffer[key + "_answer"];
-            delete answerPreview[key];
-            menuData.firstMenu[uidx].secondMenu.splice(idx, 1);
-            const itemEl = btnEl.closest('.item');
-            if (itemEl) itemEl.remove();
         };
 
         function getJson() {
