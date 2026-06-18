@@ -4,7 +4,9 @@
   "description": "3D建模图片预览",
   "scripts": {},
   "dependencies": {
-    "cos-nodejs-sdk-v5": "^2.15.4",
+    "cos-nodejs-sdk-v5": "^2.15.4"
+  },
+  "devDependencies": {
     "dotenv": "^16.4.5",
     "express": "^4.21.0",
     "multer": "^1.4.5-lts.1"
