@@ -239,9 +239,16 @@
 
         // 删除 COS 上的旧文件（先删后传）
         async function deleteFileFromCOS(cosUrl) {
-            if (!cosUrl || !isCOSUrl(cosUrl)) return;
+            if (!cosUrl) {
+                console.log('⏭ 跳过删除（空 URL）');
+                return false;
+            }
+            if (!isCOSUrl(cosUrl)) {
+                console.log('⏭ 跳过删除（非 COS URL）:', cosUrl);
+                return false;
+            }
             const key = getKeyFromUrl(cosUrl);
-            console.log(`🗑 删除旧文件: ${key}`);
+            console.log(`🗑 正在删除: ${key}`);
             try {
                 const res = await fetch('/api/delete', {
                     method: 'POST',
@@ -249,13 +256,17 @@
                     body: JSON.stringify({ key })
                 });
                 const data = await res.json();
+                console.log('删除响应:', data);
                 if (data.success) {
-                    console.log(`✅ 旧文件已删除: ${key}`);
+                    console.log(`✅ 已删除: ${key}`);
+                    return true;
                 } else {
-                    console.warn(`⚠ 删除旧文件失败: ${data.message}`);
+                    console.warn(`⚠ 删除失败: ${data.message}`);
+                    return false;
                 }
             } catch (e) {
                 console.warn('删除请求异常:', e);
+                return false;
             }
         }
 
@@ -530,6 +541,8 @@
             if (!confirm('确定删除？此操作将同时删除该例题的云端文件')) return;
             const key = `${uidx}-${idx}`;
             const itemData = menuData.firstMenu[uidx].secondMenu[idx] || {};
+            console.log(`📋 删除例题 [${key}]，itemData:`, itemData);
+            console.log(`📋 cosUrls[${key}]:`, cosUrls[key]);
             // 合并 cosUrls（当前会话上传的）和 menuData（已有的 COS URL）
             const urls = {
                 image: (cosUrls[key] && cosUrls[key].image) || (isCOSUrl(itemData.image) ? itemData.image : null),
@@ -537,16 +550,18 @@
                 video: (cosUrls[key] && cosUrls[key].video) || (isCOSUrl(itemData.video) ? itemData.video : null),
                 model: (cosUrls[key] && cosUrls[key].model) || (isCOSUrl(itemData.model) ? itemData.model : null),
             };
+            console.log(`📋 待删除 URL:`, urls);
             const deletions = [];
             for (const cat of ['image', 'answer', 'video', 'model']) {
                 if (urls[cat]) deletions.push(deleteFileFromCOS(urls[cat]));
             }
+            console.log(`📋 发起 ${deletions.length} 个删除请求`);
+            await Promise.all(deletions);
             delete cosUrls[key];
             delete fileBuffer[key];
             delete fileBuffer[key + "_video"];
             delete fileBuffer[key + "_answer"];
             delete answerPreview[key];
-            await Promise.all(deletions);
             menuData.firstMenu[uidx].secondMenu.splice(idx, 1);
             const itemEl = btnEl.closest('.item');
             if (itemEl) itemEl.remove();
