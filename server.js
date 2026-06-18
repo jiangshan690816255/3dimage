@@ -2,21 +2,22 @@ require('dotenv').config();
 
 const express = require('express');
 const path = require('path');
-const { router: apiRouter } = require('./node-functions/api/index');
+const apiRouter = require('./api-routes');
 
 const app = express();
 const PORT = process.env.PORT || 1024;
 
-// 解析 JSON body
-app.use(express.json());
+// 解析 JSON body（限制增大以支持 base64 文件传输）
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
-// 托管静态文件（html/css/js/img/models/libs 等由 EdgeOne CDN 或本地静态服务器提供）
+// 托管静态文件
 app.use(express.static(__dirname));
 
-// API 路由（与 EdgeOne node-functions/api/ 路径对应）
+// API 路由
 app.use('/api', apiRouter);
 
-// 所有路由回退到 index.html（SPA 支持）
+// SPA 回退
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'index.html'));
 });

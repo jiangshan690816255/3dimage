@@ -215,15 +215,27 @@
         let answerPreview = {};
         let cosUrls = {}; // 存储 COS 上传后的 URL，key -> { image?, model?, video?, answer? }
 
-        // 上传文件到 COS
+        // 上传文件到 COS（base64 JSON 方式，兼容本地 express 和 EdgeOne serverless）
         async function uploadFileToCOS(file, category, itemKey) {
-            const fd = new FormData();
             const ext = file.name.split('.').pop();
             const safeName = Date.now() + '_' + Math.random().toString(36).slice(2, 8) + '.' + ext;
-            fd.append('file', file);
-            fd.append('key', 'uploads/' + safeName);
+            const base64 = await new Promise(resolve => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result.split(',')[1]);
+                reader.readAsDataURL(file);
+            });
+            const body = JSON.stringify({
+                file: base64,
+                fileName: file.name,
+                contentType: file.type,
+                key: 'uploads/' + safeName,
+            });
             try {
-                const res = await fetch('/api/upload', { method: 'POST', body: fd });
+                const res = await fetch('/api/upload', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body,
+                });
                 const data = await res.json();
                 if (data.success) {
                     if (!cosUrls[itemKey]) cosUrls[itemKey] = {};
