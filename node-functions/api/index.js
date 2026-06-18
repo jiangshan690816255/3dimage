@@ -135,24 +135,61 @@ router.get('/get-menu', async (req, res) => {
   }
 });
 
-// ====================== 导出供 server.js 和 EdgeOne 使用 ======================
+// ====================== 导出供 server.js 和 EdgeOne Pages 使用 ======================
 
 // 本地开发使用：server.js 通过 require 获取 router
 exports.router = router;
 
-// EdgeOne 入口：express app
+// EdgeOne Pages 入口：express app
 const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use('/', router);
 
-// handler：EdgeOne 调用时剥离 /api 前缀
-exports.handler = async (ctx) => {
-  const { req, res } = ctx;
-  // node-functions/api/index.js 匹配 /api/*，传入的 url 可能是 /api/get-menu
-  // 去掉 /api 前缀，让 express router 匹配 /get-menu
-  if (req.url.startsWith('/api')) {
+/**
+ * Node Functions 主入口
+ * EdgeOne Pages 调用方式可能是：
+ *   1. exports.main(req, res) — 标准 Node.js HTTP Request/Response
+ *   2. exports.main(event, context) — 类 AWS Lambda 格式
+ * 此处兼容多种签名
+ */
+async function handleRequest(req, res) {
+  // 规范化 URL：如果 EdgeOne 没剥离 /api 前缀，手动剥离
+  // 最终让 Express router 能匹配 /get-menu、/upload 等路由
+  if (req.url && req.url.startsWith('/api')) {
     req.url = req.url.slice(4) || '/';
   }
   await app(req, res);
+}
+
+// 主导出（EdgeOne Pages Node Functions 识别 exports.main）
+exports.main = async function (arg1, arg2) {
+  let req, res;
+
+  if (arg2 && typeof arg2.setHeader === 'function') {
+    // 直接 (req, res) 签名
+    req = arg1;
+    res = arg2;
+  } else if (arg1 && arg1.req && arg1.res) {
+    // 包装在 { req, res } 对象中
+    req = arg1.req;
+    res = arg1.res;
+  } else if (arg1 && arg1.request) {
+    // EdgeOne / Cloudflare Workers 格式
+    // 不适用，返回错误
+    console.error('EdgeOne Workers 格式不支持，请使用 Node Functions');
+    if (arg2) {
+      arg2.statusCode = 500;
+      arg2.end('Internal Error: Workers format not supported');
+    }
+    return;
+  } else {
+    console.error('未知的 handler 调用格式', typeof arg1, typeof arg2);
+    return;
+  }
+
+  await handleRequest(req, res);
 };
+
+// 兼容旧出口名
+exports.handler = exports.main;
