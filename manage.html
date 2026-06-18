@@ -183,13 +183,14 @@
         #delUnit{background:#f56c6c;padding:6px 10px;font-size:12px}
         #tip{color:#00c48c;margin-top:10px}
 
-        .img-modal{
+        .img-modal, .video-modal{
             position:fixed;top:0;left:0;width:100%;height:100%;
             background:rgba(0,0,0,0.8);display:none;align-items:center;justify-content:center;z-index:999;
         }
-        .img-modal.show{display:flex;}
-        .modal-img{max-width:90%;max-height:90%;object-fit:contain;}
+        .img-modal.show, .video-modal.show{display:flex;}
+        .modal-img, .modal-video{max-width:90%;max-height:90%;object-fit:contain;}
         .close-modal{position:absolute;top:20px;right:30px;color:#fff;font-size:30px;cursor:pointer;}
+        .video-icon{cursor:pointer;user-select:none;}
         .upload-overlay {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(0,0,0,0.5); display: none; align-items: center; justify-content: center; z-index: 1000;
@@ -222,6 +223,11 @@
         <img class="modal-img" id="modalImg" src="">
     </div>
 
+    <div class="video-modal" id="videoModal">
+        <span class="close-modal" onclick="closeVideoModal()">×</span>
+        <video class="modal-video" id="modalVideo" controls autoplay></video>
+    </div>
+
     <div class="upload-overlay" id="uploadOverlay">
         <div class="upload-spinner"></div>
         <div class="upload-text" id="uploadText">正在上传到腾讯云...</div>
@@ -231,6 +237,8 @@
         let menuData;
         const imgModal = document.getElementById('imgModal');
         const modalImg = document.getElementById('modalImg');
+        const videoModal = document.getElementById('videoModal');
+        const modalVideo = document.getElementById('modalVideo');
         let fileBuffer = {};
         let answerPreview = {};
         let cosUrls = {}; // 存储 COS 上传后的 URL，key -> { image?, model?, video?, answer? }
@@ -339,9 +347,21 @@
             imgModal.classList.remove('show');
         }
 
+        function closeVideoModal() {
+            videoModal.classList.remove('show');
+            modalVideo.pause();
+            modalVideo.src = '';
+        }
+
         imgModal.onclick = function(e) {
             if (e.target === imgModal) {
                 closeImgModal();
+            }
+        };
+
+        videoModal.onclick = function(e) {
+            if (e.target === videoModal) {
+                closeVideoModal();
             }
         };
 
@@ -450,6 +470,24 @@
                             imgModal.classList.add('show');
                         }
                     };
+
+                    const videoIcon = i.querySelector('.video-icon');
+                    if (videoIcon) {
+                        videoIcon.onclick = async function () {
+                            const videoUrl = (cosUrls[key] && cosUrls[key].video) || item.video;
+                            if (!videoUrl) return;
+                            setUploading(true, '正在加载视频...');
+                            try {
+                                const blobUrl = await previewFromCOS(videoUrl);
+                                modalVideo.src = blobUrl;
+                                videoModal.classList.add('show');
+                            } catch(e) {
+                                alert('视频加载失败: ' + (e.message || e));
+                            } finally {
+                                setUploading(false);
+                            }
+                        };
+                    }
 
                     imgFile.onchange = async function () {
                         const f = imgFile.files[0];
