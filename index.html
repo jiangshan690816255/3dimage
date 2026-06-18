@@ -378,6 +378,7 @@
 
     function closeVideo() {
       videoPlayer.pause();
+      videoPlayer.src = '';
       videoModal.classList.remove('show');
     }
 
@@ -385,11 +386,14 @@
       if (e.target === videoModal) closeVideo();
     }
 
-    function playVideo(videoUrl) {
-      if (videoUrl) {
+    async function playVideo(videoUrl) {
+      if (!videoUrl) return;
+      if (isCOSUrl(videoUrl)) {
+        videoPlayer.src = await previewFromCOS(videoUrl);
+      } else {
         videoPlayer.src = videoUrl;
-        videoModal.classList.add('show');
       }
+      videoModal.classList.add('show');
     }
 
     // 打开答案图片（COS 图片通过预览方法获取）
