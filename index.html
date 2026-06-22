@@ -477,7 +477,7 @@
 
       list.forEach(item => {
         const a = document.createElement('a');
-        a.href = `3d.html?title=${encodeURIComponent(item.title)}`;
+        a.href = `3d.html?title=${encodeURIComponent(item.title)}&model=${encodeURIComponent(item.model || '')}`;
         a.target = '_blank';
 
         a.innerHTML = `

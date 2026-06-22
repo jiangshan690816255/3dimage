@@ -32,6 +32,35 @@
             pointer-events: none;
             white-space: nowrap;
         }
+        /* 加载动画遮罩 */
+        #loadingOverlay {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: rgba(0,0,0,0.5);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999999;
+            gap: 16px;
+        }
+        .loading-spinner {
+            width: 48px; height: 48px;
+            border: 4px solid rgba(255,255,255,0.3);
+            border-top-color: #fff;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .loading-text {
+            color: #fff;
+            font-size: 16px;
+        }
+        .loading-sub {
+            color: rgba(255,255,255,0.7);
+            font-size: 13px;
+        }
         /* 底部复位按钮 */
         #resetBtn {
             position: fixed;
@@ -67,8 +96,15 @@
 </head>
 <body>
     <div id="titleLabel"></div>
+    <!-- 加载动画 -->
+    <div id="loadingOverlay">
+        <div class="loading-spinner"></div>
+        <div class="loading-text">正在从腾讯云加载模型...</div>
+        <div class="loading-sub" id="loadingSub"></div>
+    </div>
     <button id="resetBtn">复位</button>
 
+    <script src="libs/cos-cache.js"></script>
     <script src="libs/three.js"></script>
     <script src="libs/inflate.min.js"></script>
     <script src="libs/FBXLoader.js"></script>
@@ -77,19 +113,29 @@
     <script type="text/javascript">
         const params = new URLSearchParams(window.location.search);
         const currentTitle = params.get('title') || '例题1';
+        const modelUrl = params.get('model') || '';
         document.getElementById('titleLabel').innerText = currentTitle;
 
-        const currentFbx = `models/${currentTitle}.fbx`;
+        const loadingOverlay = document.getElementById('loadingOverlay');
+        const loadingSub = document.getElementById('loadingSub');
+
+        function setLoading(text) {
+            if (text) loadingSub.textContent = text;
+        }
+        function hideLoading() {
+            loadingOverlay.style.display = 'none';
+        }
+        function showLoading() {
+            loadingOverlay.style.display = 'flex';
+        }
 
         var container, controls;
         var camera, scene, renderer;
         var objects = [];
         var group2 = new THREE.Group(), group3 = new THREE.Group();
 
-        var path = [
-            "../models/zyjibenti/zuobiaoxi3.fbx",
-            currentFbx
-        ];
+        // 坐标轴模型保持本地加载
+        var axisPath = "models/zyjibenti/zuobiaoxi3.fbx";
 
         init();
         animate();
@@ -101,7 +147,6 @@
                 fitCameraToObject(camera, controls, model);
             }
         }
-        // 绑定按钮点击事件
         document.getElementById('resetBtn').addEventListener('click', reset);
 
         function init() {
@@ -140,8 +185,8 @@
             group3.position.set(83, -64, -64);
             scene.add(group2, group3);
 
-            loadmodel2(path[0], "a11");
-            loadmodel2(path[1], "a12");
+            loadmodel2(axisPath, "a11");
+            loadMainModel(modelUrl, currentTitle);
         }
 
         function fitCameraToObject(camera, controls, object, offset = 1.8) {
@@ -170,9 +215,32 @@
             renderer.render(scene, camera);
         }
 
-        function loadmodel2(patha, str) {
+        // 加载主模型：优先使用 COS URL（带 IndexedDB 缓存），否则回退本地文件
+        async function loadMainModel(url, title) {
+            let blobUrl = null;
+            if (url) {
+                try {
+                    setLoading('正在从腾讯云下载模型...');
+                    blobUrl = await getCOSBlob(url);
+                    setLoading('模型下载完成，正在解析...');
+                } catch (e) {
+                    console.warn('云端模型加载失败，尝试本地加载:', e.message);
+                    blobUrl = null;
+                }
+            }
+
+            if (!blobUrl) {
+                // 回退到本地文件
+                setLoading('正在加载本地模型文件...');
+                blobUrl = `models/${title}.fbx`;
+            }
+
+            loadFBXFromURL(blobUrl, "a12");
+        }
+
+        function loadFBXFromURL(blobUrl, str) {
             var loader = new THREE.FBXLoader();
-            loader.load(patha, function (object0) {
+            loader.load(blobUrl, function (object0) {
                 object0.visible = true;
                 object0.rotation.x = -Math.PI / 2;
 
@@ -196,9 +264,23 @@
                 object0.name = str;
                 scene.add(object0);
                 fitCameraToObject(camera, controls, object0);
+                hideLoading();
+            }, undefined, function (err) {
+                console.error('FBX 模型解析失败:', err);
+                hideLoading();
             });
         }
 
+        function loadmodel2(patha, str) {
+            var loader = new THREE.FBXLoader();
+            loader.load(patha, function (object0) {
+                object0.visible = true;
+                object0.rotation.x = -Math.PI / 2;
+                object0.traverse(child => { if (child.isMesh) child.visible = true; });
+                object0.name = str;
+                scene.add(object0);
+            });
+        }
     </script>
 </body>
 </html>
