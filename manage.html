@@ -269,6 +269,18 @@
         let isDirty = false; // 跟踪是否有未保存的修改
         let nextItemId = 1; // 例题唯一序号，自增
 
+        // 生成二维码 base64（离屏 div → 取子 canvas → toDataURL）
+        function generateQRBase64(url) {
+            const container = document.createElement('div');
+            container.style.cssText = 'position:absolute;left:-9999px;top:-9999px;';
+            document.body.appendChild(container);
+            new QRCode(container, { text: url, width: 66, height: 66, colorDark: '#000', colorLight: '#fff' });
+            const qrCanvas = container.querySelector('canvas');
+            const data = qrCanvas ? qrCanvas.toDataURL('image/png') : '';
+            document.body.removeChild(container);
+            return data;
+        }
+
         // 离开页面时提醒
         window.addEventListener('beforeunload', function (e) {
             if (isDirty || Object.keys(cosUrls).length > 0) {
@@ -410,6 +422,16 @@
                 menuData.firstMenu.forEach(unit => {
                     unit.secondMenu.forEach(item => {
                         if (item.id && typeof item.id === 'number' && item.id > maxId) maxId = item.id;
+                    });
+                });
+                // 自动为历史例题补全 ID 和生成二维码
+                menuData.firstMenu.forEach(unit => {
+                    unit.secondMenu.forEach(item => {
+                        if (!item.id) item.id = ++maxId;
+                        if (item.id && !item.qrcode) {
+                            const qrUrl = `${location.origin}/3d.html?id=${item.id}`;
+                            item.qrcode = generateQRBase64(qrUrl);
+                        }
                     });
                 });
                 nextItemId = maxId + 1;
@@ -648,13 +670,6 @@
 
         document.getElementById('addUnitBtn').onclick = function () {
             const itemId = nextItemId++;
-            const container = document.createElement('div');
-            container.style.cssText = 'position:absolute;left:-9999px;top:-9999px;';
-            document.body.appendChild(container);
-            new QRCode(container, { text: `${location.origin}/3d.html?id=${itemId}`, width: 66, height: 66, colorDark: '#000', colorLight: '#fff' });
-            const qrCanvas = container.querySelector('canvas');
-            const qrcodeData = qrCanvas ? qrCanvas.toDataURL('image/png') : '';
-            document.body.removeChild(container);
             menuData.firstMenu.push({
                 id: 'unit' + Date.now(),
                 name: "新单元",
@@ -665,7 +680,7 @@
                     model: "",
                     video: "",
                     answer: "",
-                    qrcode: qrcodeData
+                    qrcode: generateQRBase64(`${location.origin}/3d.html?id=${itemId}`)
                 }]
             });
             render();
@@ -712,13 +727,6 @@
 
         window.addItem = function (uidx) {
             const itemId = nextItemId++;
-            const container = document.createElement('div');
-            container.style.cssText = 'position:absolute;left:-9999px;top:-9999px;';
-            document.body.appendChild(container);
-            new QRCode(container, { text: `${location.origin}/3d.html?id=${itemId}`, width: 66, height: 66, colorDark: '#000', colorLight: '#fff' });
-            const qrCanvas = container.querySelector('canvas');
-            const qrcodeData = qrCanvas ? qrCanvas.toDataURL('image/png') : '';
-            document.body.removeChild(container);
             menuData.firstMenu[uidx].secondMenu.push({
                 id: itemId,
                 title: "新例题",
@@ -726,7 +734,7 @@
                 model: "",
                 video: "",
                 answer: "",
-                qrcode: qrcodeData
+                qrcode: generateQRBase64(`${location.origin}/3d.html?id=${itemId}`)
             });
             render();
             isDirty = true;
@@ -809,14 +817,7 @@
                     if (!item.id) item.id = ++maxId;
                     // 有 id 但缺少二维码时补充生成（兼容旧数据）
                     if (item.id && !item.qrcode) {
-                        const qrUrl = `${location.origin}/3d.html?id=${item.id}`;
-                        const container = document.createElement('div');
-                        container.style.cssText = 'position:absolute;left:-9999px;top:-9999px;';
-                        document.body.appendChild(container);
-                        new QRCode(container, { text: qrUrl, width: 66, height: 66, colorDark: '#000', colorLight: '#fff' });
-                        const qrCanvas = container.querySelector('canvas');
-                        item.qrcode = qrCanvas ? qrCanvas.toDataURL('image/png') : '';
-                        document.body.removeChild(container);
+                        item.qrcode = generateQRBase64(`${location.origin}/3d.html?id=${item.id}`);
                     }
                 });
             });
