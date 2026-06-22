@@ -106,6 +106,19 @@ router.post('/save-menu', async (req, res) => {
   }
 });
 
+// ==================== POST /verify-admin ====================
+router.post('/verify-admin', (req, res) => {
+  const { password } = req.body;
+  const adminId = process.env.ADMIN_APP_ID;
+  if (!adminId) {
+    return res.status(500).json({ success: false, message: '服务端未配置 ADMIN_APP_ID' });
+  }
+  if (password === adminId) {
+    return res.json({ success: true });
+  }
+  return res.status(403).json({ success: false, message: '密码错误，非法操作' });
+});
+
 // ==================== POST /delete ====================
 router.post('/delete', async (req, res) => {
   const key = req.body.key;

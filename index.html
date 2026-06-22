@@ -330,6 +330,102 @@
       align-items: center;
       justify-content: center;
     }
+
+    /* 管理后台入口按钮 */
+    .admin-entry {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      background: rgba(99,102,241,0.85);
+      color: #fff;
+      border: none;
+      font-size: 22px;
+      cursor: pointer;
+      box-shadow: 0 4px 16px rgba(99,102,241,0.4);
+      transition: 0.2s;
+      z-index: 999;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .admin-entry:hover {
+      background: #4f46e5;
+      transform: scale(1.1);
+      box-shadow: 0 6px 20px rgba(99,102,241,0.5);
+    }
+
+    /* 管理密码弹窗 */
+    .admin-modal {
+      position: fixed;
+      top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0,0,0,0.5);
+      z-index: 9999;
+      display: none;
+      align-items: center;
+      justify-content: center;
+    }
+    .admin-modal.show { display: flex; }
+    .admin-dialog {
+      background: #fff;
+      border-radius: 12px;
+      padding: 28px 24px 20px;
+      width: 90%;
+      max-width: 360px;
+      box-shadow: 0 12px 40px rgba(0,0,0,0.2);
+    }
+    .admin-title {
+      font-size: 18px;
+      font-weight: 700;
+      margin-bottom: 16px;
+      text-align: center;
+      color: #1f2937;
+    }
+    .admin-input {
+      width: 100%;
+      padding: 10px 14px;
+      border: 1px solid #d1d5db;
+      border-radius: 8px;
+      font-size: 15px;
+      outline: none;
+      box-sizing: border-box;
+    }
+    .admin-input:focus {
+      border-color: #6366f1;
+      box-shadow: 0 0 0 3px rgba(99,102,241,0.15);
+    }
+    .admin-err {
+      color: #ef4444;
+      font-size: 13px;
+      margin-top: 8px;
+      min-height: 20px;
+    }
+    .admin-btns {
+      display: flex;
+      gap: 10px;
+      margin-top: 16px;
+    }
+    .admin-btn {
+      flex: 1;
+      padding: 10px 0;
+      border-radius: 8px;
+      border: none;
+      font-size: 15px;
+      cursor: pointer;
+      transition: 0.2s;
+    }
+    .admin-btn.cancel {
+      background: #f3f4f6;
+      color: #374151;
+    }
+    .admin-btn.cancel:hover { background: #e5e7eb; }
+    .admin-btn.submit {
+      background: #6366f1;
+      color: #fff;
+    }
+    .admin-btn.submit:hover { background: #4f46e5; }
   </style>
 </head>
 
@@ -364,6 +460,22 @@
     <img class="answer-img" id="answerImg">
   </div>
 
+  <!-- 管理后台密码弹窗 -->
+  <div class="admin-modal" id="adminModal">
+    <div class="admin-dialog">
+      <div class="admin-title">管理员验证</div>
+      <input class="admin-input" id="adminPwd" type="password" placeholder="请输入管理密码" autocomplete="off">
+      <div class="admin-err" id="adminErr"></div>
+      <div class="admin-btns">
+        <button class="admin-btn cancel" onclick="closeAdminModal()">取消</button>
+        <button class="admin-btn submit" onclick="verifyAdmin()">确认</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 管理入口按钮 -->
+  <button class="admin-entry" id="adminEntry" title="管理后台">⚙</button>
+
   <script src="libs/cos-cache.js"></script>
   <script>
     const videoModal = document.getElementById('videoModal');
@@ -376,6 +488,55 @@
     const menuItems = document.getElementById('menuItems');
     const answerModal = document.getElementById('answerModal');
     const answerImg = document.getElementById('answerImg');
+    const adminModal = document.getElementById('adminModal');
+    const adminPwd = document.getElementById('adminPwd');
+    const adminErr = document.getElementById('adminErr');
+    const adminEntry = document.getElementById('adminEntry');
+
+    // ========== 管理后台入口 ==========
+    adminEntry.onclick = () => {
+      adminPwd.value = '';
+      adminErr.textContent = '';
+      adminModal.classList.add('show');
+      adminPwd.focus();
+    };
+
+    function closeAdminModal() {
+      adminModal.classList.remove('show');
+    }
+
+    adminModal.onclick = (e) => {
+      if (e.target === adminModal) closeAdminModal();
+    };
+
+    adminPwd.onkeydown = (e) => {
+      if (e.key === 'Enter') verifyAdmin();
+    };
+
+    async function verifyAdmin() {
+      const pwd = adminPwd.value.trim();
+      if (!pwd) {
+        adminErr.textContent = '请输入密码';
+        return;
+      }
+      adminErr.textContent = '';
+      try {
+        const res = await fetch('/api/verify-admin', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ password: pwd }),
+        });
+        const data = await res.json();
+        if (data.success) {
+          closeAdminModal();
+          window.location.href = 'manage.html';
+        } else {
+          adminErr.textContent = data.message || '非法操作';
+        }
+      } catch(e) {
+        adminErr.textContent = '验证失败，请稍后重试';
+      }
+    }
 
     // 判断是否为 COS URL
     function isCOSUrl(url) {

@@ -115,6 +115,10 @@
             cursor:pointer;
             display:block;
         }
+        /* 无图片时不显示预览（避免空白边框/裂图占位） */
+        img.prev[src=""], img.answer-prev[src=""] {
+            display: none;
+        }
         .answer-tag{
             position:absolute;
             top:-4px;
