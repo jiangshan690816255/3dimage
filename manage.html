@@ -233,6 +233,7 @@
         <div class="upload-text" id="uploadText">正在上传到腾讯云...</div>
     </div>
 
+    <script src="libs/cos-cache.js"></script>
     <script>
         let menuData;
         const imgModal = document.getElementById('imgModal');
@@ -335,13 +336,8 @@
             } catch { return false; }
         }
 
-        // 通过 COS URL 获取本地预览 blob URL（仅用于 COS 图片）
-        async function previewFromCOS(cosUrl) {
-            const cosKey = getKeyFromUrl(cosUrl);
-            const previewRes = await fetch('/api/preview?key=' + encodeURIComponent(cosKey));
-            const blob = await previewRes.blob();
-            return URL.createObjectURL(blob);
-        }
+        // 通过 COS URL 获取本地预览 blob URL（使用 IndexedDB 缓存）
+        // getCOSBlob 由 libs/cos-cache.js 提供，含 IndexedDB 缓存
 
         function closeImgModal() {
             imgModal.classList.remove('show');
@@ -478,7 +474,7 @@
                             if (!videoUrl) return;
                             setUploading(true, '正在加载视频...');
                             try {
-                                const blobUrl = await previewFromCOS(videoUrl);
+                                const blobUrl = await getCOSBlob(videoUrl);
                                 modalVideo.src = blobUrl;
                                 videoModal.classList.add('show');
                             } catch(e) {
@@ -497,7 +493,7 @@
                             await deleteFileFromCOS(cosUrls[key] && cosUrls[key].image);
                             const result = await uploadFileToCOS(f, 'image', key);
                             if (result && result.success && result.url) {
-                                prev.src = await previewFromCOS(result.url);
+                                prev.src = await getCOSBlob(result.url);
                                 console.log('✅ 图片上传完成，预览已更新');
                             } else {
                                 alert('图片上传失败，请重试');
@@ -517,7 +513,7 @@
                             fileBuffer[key + "_answer"] = f;
                             const result = await uploadFileToCOS(f, 'answer', key);
                             if (result && result.success && result.url) {
-                                answerPrev.src = await previewFromCOS(result.url);
+                                answerPrev.src = await getCOSBlob(result.url);
                                 answerTag.classList.add('show');
                                 console.log('✅ 答案图上传完成');
                             } else {
@@ -572,10 +568,10 @@
 
                     // 初始加载时，教学图和答案通过预览方法获取 blob URL
                     if (item.image && isCOSUrl(item.image)) {
-                        previewFromCOS(item.image).then(blobUrl => { prev.src = blobUrl; });
+                        getCOSBlob(item.image).then(blobUrl => { prev.src = blobUrl; });
                     }
                     if (item.answer && isCOSUrl(item.answer)) {
-                        previewFromCOS(item.answer).then(blobUrl => { answerPrev.src = blobUrl; });
+                        getCOSBlob(item.answer).then(blobUrl => { answerPrev.src = blobUrl; });
                     }
                 });
             });

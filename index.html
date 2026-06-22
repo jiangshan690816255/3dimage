@@ -364,6 +364,7 @@
     <img class="answer-img" id="answerImg">
   </div>
 
+  <script src="libs/cos-cache.js"></script>
   <script>
     const videoModal = document.getElementById('videoModal');
     const videoPlayer = document.getElementById('videoPlayer');
@@ -384,15 +385,9 @@
       } catch { return false; }
     }
 
-    // 从 COS URL 获取本地预览 blob URL
+    // 从 COS URL 获取本地预览 blob URL（使用 IndexedDB 缓存）
     function getKeyFromUrl(url) {
       return new URL(url).pathname.substring(1);
-    }
-    async function previewFromCOS(cosUrl) {
-      const cosKey = getKeyFromUrl(cosUrl);
-      const previewRes = await fetch('/api/preview?key=' + encodeURIComponent(cosKey));
-      const blob = await previewRes.blob();
-      return URL.createObjectURL(blob);
     }
 
     // 折叠/展开菜单
@@ -420,7 +415,7 @@
       videoLoading.classList.add('show');
       try {
         if (isCOSUrl(videoUrl)) {
-          videoPlayer.src = await previewFromCOS(videoUrl);
+          videoPlayer.src = await getCOSBlob(videoUrl);
         } else {
           videoPlayer.src = videoUrl;
         }
@@ -433,7 +428,7 @@
     async function openAnswer(imgUrl) {
       if (!imgUrl) return;
       if (isCOSUrl(imgUrl)) {
-        answerImg.src = await previewFromCOS(imgUrl);
+        answerImg.src = await getCOSBlob(imgUrl);
       } else {
         answerImg.src = imgUrl;
       }
@@ -501,7 +496,7 @@
         // 教学图：COS 图片通过预览方法获取 blob URL
         if (item.image) {
           if (isCOSUrl(item.image)) {
-            previewFromCOS(item.image).then(blobUrl => { img.src = blobUrl; });
+            getCOSBlob(item.image).then(blobUrl => { img.src = blobUrl; });
           } else {
             img.src = item.image;
           }
