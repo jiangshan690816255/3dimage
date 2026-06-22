@@ -648,8 +648,13 @@
 
         document.getElementById('addUnitBtn').onclick = function () {
             const itemId = nextItemId++;
-            const tmpCanvas = document.createElement('canvas');
-            new QRCode(tmpCanvas, { text: `${location.origin}/3d.html?id=${itemId}`, width: 66, height: 66, colorDark: '#000', colorLight: '#fff' });
+            const container = document.createElement('div');
+            container.style.cssText = 'position:absolute;left:-9999px;top:-9999px;';
+            document.body.appendChild(container);
+            new QRCode(container, { text: `${location.origin}/3d.html?id=${itemId}`, width: 66, height: 66, colorDark: '#000', colorLight: '#fff' });
+            const qrCanvas = container.querySelector('canvas');
+            const qrcodeData = qrCanvas ? qrCanvas.toDataURL('image/png') : '';
+            document.body.removeChild(container);
             menuData.firstMenu.push({
                 id: 'unit' + Date.now(),
                 name: "新单元",
@@ -660,7 +665,7 @@
                     model: "",
                     video: "",
                     answer: "",
-                    qrcode: tmpCanvas.toDataURL('image/png')
+                    qrcode: qrcodeData
                 }]
             });
             render();
@@ -707,8 +712,13 @@
 
         window.addItem = function (uidx) {
             const itemId = nextItemId++;
-            const tmpCanvas = document.createElement('canvas');
-            new QRCode(tmpCanvas, { text: `${location.origin}/3d.html?id=${itemId}`, width: 66, height: 66, colorDark: '#000', colorLight: '#fff' });
+            const container = document.createElement('div');
+            container.style.cssText = 'position:absolute;left:-9999px;top:-9999px;';
+            document.body.appendChild(container);
+            new QRCode(container, { text: `${location.origin}/3d.html?id=${itemId}`, width: 66, height: 66, colorDark: '#000', colorLight: '#fff' });
+            const qrCanvas = container.querySelector('canvas');
+            const qrcodeData = qrCanvas ? qrCanvas.toDataURL('image/png') : '';
+            document.body.removeChild(container);
             menuData.firstMenu[uidx].secondMenu.push({
                 id: itemId,
                 title: "新例题",
@@ -716,7 +726,7 @@
                 model: "",
                 video: "",
                 answer: "",
-                qrcode: tmpCanvas.toDataURL('image/png')
+                qrcode: qrcodeData
             });
             render();
             isDirty = true;
@@ -787,7 +797,7 @@
                 menuData.firstMenu[uidx].secondMenu = arr;
             });
 
-            // 补全缺失的 id（已有数据可能没有 id 字段）
+                // 补全缺失的 id（已有数据可能没有 id 字段）
             let maxId = 0;
             menuData.firstMenu.forEach(unit => {
                 unit.secondMenu.forEach(item => {
@@ -800,9 +810,13 @@
                     // 有 id 但缺少二维码时补充生成（兼容旧数据）
                     if (item.id && !item.qrcode) {
                         const qrUrl = `${location.origin}/3d.html?id=${item.id}`;
-                        const tmpCanvas = document.createElement('canvas');
-                        new QRCode(tmpCanvas, { text: qrUrl, width: 66, height: 66, colorDark: '#000', colorLight: '#fff' });
-                        item.qrcode = tmpCanvas.toDataURL('image/png');
+                        const container = document.createElement('div');
+                        container.style.cssText = 'position:absolute;left:-9999px;top:-9999px;';
+                        document.body.appendChild(container);
+                        new QRCode(container, { text: qrUrl, width: 66, height: 66, colorDark: '#000', colorLight: '#fff' });
+                        const qrCanvas = container.querySelector('canvas');
+                        item.qrcode = qrCanvas ? qrCanvas.toDataURL('image/png') : '';
+                        document.body.removeChild(container);
                     }
                 });
             });
