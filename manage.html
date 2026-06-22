@@ -115,8 +115,11 @@
             cursor:pointer;
             display:block;
         }
-        /* 无图片时不显示预览（避免空白边框/裂图占位） */
+        /* 无图片时不显示预览和标签（避免空白边框/裂图占位） */
         img.prev[src=""], img.answer-prev[src=""] {
+            display: none;
+        }
+        .img-wrap:has(img[src=""]) .img-tag {
             display: none;
         }
         .answer-tag{
@@ -158,6 +161,20 @@
         }
         .video-wrap .img-tag { background: #1677ff; position: absolute; top: -4px; right: -4px; }
         .model-wrap .img-tag { background: #ef4444; position: absolute; top: -4px; right: -4px; }
+
+        /* 二维码容器 */
+        .qr-wrap {
+            flex-shrink: 0;
+            width: 74px;
+            height: 74px;
+            border: 1px solid #e5e7eb;
+            border-radius: 4px;
+            overflow: hidden;
+            display: none;
+            position: relative;
+        }
+        .qr-wrap.show { display: flex; align-items: center; justify-content: center; }
+        .qr-canvas { width: 66px; height: 66px; }
 
         .item button{
             background:#f56c6c!important;
@@ -238,6 +255,7 @@
     </div>
 
     <script src="libs/cos-cache.js"></script>
+    <script src="libs/qrcode.min.js"></script>
     <script>
         let menuData;
         const imgModal = document.getElementById('imgModal');
@@ -248,6 +266,23 @@
         let answerPreview = {};
         let cosUrls = {}; // 存储 COS 上传后的 URL，key -> { image?, model?, video?, answer? }
         let uploading = false;
+        let isDirty = false; // 跟踪是否有未保存的修改
+
+        // 离开页面时提醒
+        window.addEventListener('beforeunload', function (e) {
+            if (isDirty || Object.keys(cosUrls).length > 0) {
+                e.preventDefault();
+                e.returnValue = '你有未保存的修改，确定要离开吗？';
+                return e.returnValue;
+            }
+        });
+
+        // 监听编辑区域文本修改（通过事件委托）
+        document.getElementById('editor').addEventListener('input', function (e) {
+            if (e.target.closest('.uname') || e.target.closest('.title')) {
+                isDirty = true;
+            }
+        });
 
         // 锁定/解锁界面，显示上传 loading
         function setUploading(state, text) {
@@ -370,6 +405,7 @@
             .then(data => {
                 menuData = data;
                 render();
+                isDirty = false;
             })
             .catch(() => {
                 menuData = {
@@ -386,6 +422,7 @@
                     }]
                 };
                 render();
+                isDirty = false;
             });
 
         function render() {
@@ -443,6 +480,9 @@
                                 <div class="model-icon">3D</div>
                                 <div class="img-tag">模型</div>
                             </div>
+                            <div class="qr-wrap ${item.model ? 'show' : ''}">
+                                <canvas class="qr-canvas"></canvas>
+                            </div>
                         </div>
                         <button onclick="delItem(${uidx},${idx}, this)">删</button>
                     `;
@@ -498,6 +538,7 @@
                             const result = await uploadFileToCOS(f, 'image', key);
                             if (result && result.success && result.url) {
                                 prev.src = await getCOSBlob(result.url);
+                                isDirty = true;
                                 console.log('✅ 图片上传完成，预览已更新');
                             } else {
                                 alert('图片上传失败，请重试');
@@ -519,6 +560,7 @@
                             if (result && result.success && result.url) {
                                 answerPrev.src = await getCOSBlob(result.url);
                                 answerTag.classList.add('show');
+                                isDirty = true;
                                 console.log('✅ 答案图上传完成');
                             } else {
                                 alert('答案图上传失败，请重试');
@@ -540,6 +582,7 @@
                             if (result && result.success && result.url) {
                                 fileBuffer[key + "_video"] = f;
                                 videoWrap.classList.add('show');
+                                isDirty = true;
                                 console.log('✅ 视频上传完成');
                             } else {
                                 alert('视频上传失败，请重试');
@@ -560,6 +603,7 @@
                             if (result && result.success && result.url) {
                                 fileBuffer[key] = f;
                                 fbxWrap.classList.add('show');
+                                isDirty = true;
                                 console.log('✅ 模型上传完成');
                             } else {
                                 alert('模型上传失败，请重试');
@@ -569,6 +613,15 @@
                             setUploading(false);
                         }
                     };
+
+                    // 已保存的例题（有模型）生成二维码
+                    const qrWrap = i.querySelector('.qr-wrap');
+                    const qrCanvas = i.querySelector('.qr-canvas');
+                    if (item.model && qrCanvas) {
+                        const qrUrl = `${location.origin}/3d.html?title=${encodeURIComponent(item.title)}&model=${encodeURIComponent(item.model)}`;
+                        qrWrap.title = '扫描二维码在手机上查看3D模型';
+                        new QRCode(qrCanvas, { text: qrUrl, width: 66, height: 66, colorDark: '#000', colorLight: '#fff' });
+                    }
 
                     // 初始加载时，教学图和答案通过预览方法获取 blob URL
                     if (item.image && isCOSUrl(item.image)) {
@@ -606,6 +659,7 @@
                 }]
             });
             render();
+            isDirty = true;
         };
 
         window.delUnit = async function (uidx, e) {
@@ -640,6 +694,7 @@
                 await Promise.all(deletions);
                 menuData.firstMenu.splice(uidx, 1);
                 render();
+                isDirty = true;
             } finally {
                 setUploading(false);
             }
@@ -654,6 +709,7 @@
                 answer: ""
             });
             render();
+            isDirty = true;
             const content = document.getElementById(`content-${uidx}`);
             const icon = document.getElementById(`icon-${uidx}`);
             content.style.display = 'block';
@@ -685,6 +741,7 @@
                 menuData.firstMenu[uidx].secondMenu.splice(idx, 1);
                 const itemEl = btnEl.closest('.item');
                 if (itemEl) itemEl.remove();
+                isDirty = true;
             } finally {
                 setUploading(false);
             }
@@ -737,6 +794,9 @@
                 const data = await res.json();
                 if (data.success) {
                     tip.innerText = "✅ 上传完成！";
+                    isDirty = false;
+                    cosUrls = {};
+                    fileBuffer = {};
                 } else {
                     tip.innerText = "❌ 上传失败：" + data.message;
                 }
