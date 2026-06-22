@@ -489,7 +489,7 @@
                                 <div class="model-icon">3D</div>
                                 <div class="img-tag">模型</div>
                             </div>
-                            <div class="qr-wrap ${item.model ? 'show' : ''}">
+                            <div class="qr-wrap ${item.qrcode ? 'show' : ''}">
                                 <img class="qr-img" src="${item.qrcode || ''}">
                             </div>
                         </div>
@@ -647,16 +647,20 @@
         };
 
         document.getElementById('addUnitBtn').onclick = function () {
+            const itemId = nextItemId++;
+            const tmpCanvas = document.createElement('canvas');
+            new QRCode(tmpCanvas, { text: `${location.origin}/3d.html?id=${itemId}`, width: 66, height: 66, colorDark: '#000', colorLight: '#fff' });
             menuData.firstMenu.push({
                 id: 'unit' + Date.now(),
                 name: "新单元",
                 secondMenu: [{
-                    id: nextItemId++,
+                    id: itemId,
                     title: "新例题",
                     image: "",
                     model: "",
                     video: "",
-                    answer: ""
+                    answer: "",
+                    qrcode: tmpCanvas.toDataURL('image/png')
                 }]
             });
             render();
@@ -702,13 +706,17 @@
         };
 
         window.addItem = function (uidx) {
+            const itemId = nextItemId++;
+            const tmpCanvas = document.createElement('canvas');
+            new QRCode(tmpCanvas, { text: `${location.origin}/3d.html?id=${itemId}`, width: 66, height: 66, colorDark: '#000', colorLight: '#fff' });
             menuData.firstMenu[uidx].secondMenu.push({
-                id: nextItemId++,
+                id: itemId,
                 title: "新例题",
                 image: "",
                 model: "",
                 video: "",
-                answer: ""
+                answer: "",
+                qrcode: tmpCanvas.toDataURL('image/png')
             });
             render();
             isDirty = true;
@@ -789,8 +797,8 @@
             menuData.firstMenu.forEach(unit => {
                 unit.secondMenu.forEach(item => {
                     if (!item.id) item.id = ++maxId;
-                    // 有模型时生成/刷新二维码
-                    if (item.model && !item.qrcode) {
+                    // 有 id 但缺少二维码时补充生成（兼容旧数据）
+                    if (item.id && !item.qrcode) {
                         const qrUrl = `${location.origin}/3d.html?id=${item.id}`;
                         const tmpCanvas = document.createElement('canvas');
                         new QRCode(tmpCanvas, { text: qrUrl, width: 66, height: 66, colorDark: '#000', colorLight: '#fff' });
