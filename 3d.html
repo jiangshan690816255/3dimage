@@ -112,9 +112,11 @@
 
     <script type="text/javascript">
         const params = new URLSearchParams(window.location.search);
-        const currentTitle = params.get('title') || '例题1';
-        const modelUrl = params.get('model') || '';
-        document.getElementById('titleLabel').innerText = currentTitle;
+        const itemId = parseInt(params.get('id')) || 0;
+        let currentTitle = '例题1';
+        let modelUrl = '';
+
+        document.getElementById('titleLabel').innerText = '加载中...';
 
         const loadingOverlay = document.getElementById('loadingOverlay');
         const loadingSub = document.getElementById('loadingSub');
@@ -137,8 +139,36 @@
         // 坐标轴模型保持本地加载
         var axisPath = "models/zyjibenti/zuobiaoxi3.fbx";
 
-        init();
-        animate();
+        // 通过 id 查找例题，回退到旧参数兼容
+        async function resolveModel() {
+            if (itemId) {
+                try {
+                    const res = await fetch('/api/get-menu?_=' + Date.now());
+                    const data = await res.json();
+                    for (const unit of data.firstMenu) {
+                        for (const item of unit.secondMenu) {
+                            if (item.id === itemId) {
+                                currentTitle = item.title || '例题';
+                                modelUrl = item.model || '';
+                                document.getElementById('titleLabel').innerText = currentTitle;
+                                return;
+                            }
+                        }
+                    }
+                } catch (e) {
+                    console.warn('获取菜单失败，使用默认值');
+                }
+            }
+            // 兼容旧参数
+            currentTitle = params.get('title') || '例题1';
+            modelUrl = params.get('model') || '';
+            document.getElementById('titleLabel').innerText = currentTitle;
+        }
+
+        resolveModel().then(() => {
+            init();
+            animate();
+        });
 
         // 复位函数
         function reset() {

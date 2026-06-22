@@ -174,7 +174,7 @@
             position: relative;
         }
         .qr-wrap.show { display: flex; align-items: center; justify-content: center; }
-        .qr-canvas { width: 66px; height: 66px; }
+        .qr-img { width: 66px; height: 66px; }
 
         .item button{
             background:#f56c6c!important;
@@ -267,6 +267,7 @@
         let cosUrls = {}; // 存储 COS 上传后的 URL，key -> { image?, model?, video?, answer? }
         let uploading = false;
         let isDirty = false; // 跟踪是否有未保存的修改
+        let nextItemId = 1; // 例题唯一序号，自增
 
         // 离开页面时提醒
         window.addEventListener('beforeunload', function (e) {
@@ -404,6 +405,14 @@
             .then(res => res.json())
             .then(data => {
                 menuData = data;
+                // 计算已有例题的最大ID，初始化 nextItemId
+                let maxId = 0;
+                menuData.firstMenu.forEach(unit => {
+                    unit.secondMenu.forEach(item => {
+                        if (item.id && typeof item.id === 'number' && item.id > maxId) maxId = item.id;
+                    });
+                });
+                nextItemId = maxId + 1;
                 render();
                 isDirty = false;
             })
@@ -481,7 +490,7 @@
                                 <div class="img-tag">模型</div>
                             </div>
                             <div class="qr-wrap ${item.model ? 'show' : ''}">
-                                <canvas class="qr-canvas"></canvas>
+                                <img class="qr-img" src="${item.qrcode || ''}">
                             </div>
                         </div>
                         <button onclick="delItem(${uidx},${idx}, this)">删</button>
@@ -614,15 +623,6 @@
                         }
                     };
 
-                    // 已保存的例题（有模型）生成二维码
-                    const qrWrap = i.querySelector('.qr-wrap');
-                    const qrCanvas = i.querySelector('.qr-canvas');
-                    if (item.model && qrCanvas) {
-                        const qrUrl = `${location.origin}/3d.html?title=${encodeURIComponent(item.title)}&model=${encodeURIComponent(item.model)}`;
-                        qrWrap.title = '扫描二维码在手机上查看3D模型';
-                        new QRCode(qrCanvas, { text: qrUrl, width: 66, height: 66, colorDark: '#000', colorLight: '#fff' });
-                    }
-
                     // 初始加载时，教学图和答案通过预览方法获取 blob URL
                     if (item.image && isCOSUrl(item.image)) {
                         getCOSBlob(item.image).then(blobUrl => { prev.src = blobUrl; });
@@ -651,6 +651,7 @@
                 id: 'unit' + Date.now(),
                 name: "新单元",
                 secondMenu: [{
+                    id: nextItemId++,
                     title: "新例题",
                     image: "",
                     model: "",
@@ -702,6 +703,7 @@
 
         window.addItem = function (uidx) {
             menuData.firstMenu[uidx].secondMenu.push({
+                id: nextItemId++,
                 title: "新例题",
                 image: "",
                 model: "",
@@ -756,22 +758,48 @@
                     const key = `${uidx}-${idx}`;
                     const oldData = menuData.firstMenu[uidx].secondMenu[idx] || {};
 
+                    const newModel = (cosUrls[key] && cosUrls[key].model)
+                        ? getKeyFromUrl(cosUrls[key].model) : (oldData.model || "");
+
                     const itemData = {
+                        id: oldData.id || 0,
                         title: t,
                         image: (cosUrls[key] && cosUrls[key].image)
                             ? getKeyFromUrl(cosUrls[key].image) : (oldData.image || ""),
-                        model: (cosUrls[key] && cosUrls[key].model)
-                            ? getKeyFromUrl(cosUrls[key].model) : (oldData.model || ""),
+                        model: newModel,
                         video: (cosUrls[key] && cosUrls[key].video)
                             ? getKeyFromUrl(cosUrls[key].video) : (oldData.video || ""),
                         answer: (cosUrls[key] && cosUrls[key].answer)
-                            ? getKeyFromUrl(cosUrls[key].answer) : (oldData.answer || "")
+                            ? getKeyFromUrl(cosUrls[key].answer) : (oldData.answer || ""),
+                        qrcode: oldData.qrcode || ""
                     };
 
                     arr.push(itemData);
                 });
                 menuData.firstMenu[uidx].secondMenu = arr;
             });
+
+            // 补全缺失的 id（已有数据可能没有 id 字段）
+            let maxId = 0;
+            menuData.firstMenu.forEach(unit => {
+                unit.secondMenu.forEach(item => {
+                    if (item.id && item.id > maxId) maxId = item.id;
+                });
+            });
+            menuData.firstMenu.forEach(unit => {
+                unit.secondMenu.forEach(item => {
+                    if (!item.id) item.id = ++maxId;
+                    // 有模型时生成/刷新二维码
+                    if (item.model && !item.qrcode) {
+                        const qrUrl = `${location.origin}/3d.html?id=${item.id}`;
+                        const tmpCanvas = document.createElement('canvas');
+                        new QRCode(tmpCanvas, { text: qrUrl, width: 66, height: 66, colorDark: '#000', colorLight: '#fff' });
+                        item.qrcode = tmpCanvas.toDataURL('image/png');
+                    }
+                });
+            });
+            nextItemId = maxId + 1;
+
             return JSON.stringify(menuData, null, 2);
         }
 
